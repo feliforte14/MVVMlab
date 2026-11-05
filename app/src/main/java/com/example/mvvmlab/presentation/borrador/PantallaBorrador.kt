@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.borrador
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,10 +8,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mvvmlab.core.theme.MvvmLabTheme
 
 // VIEW sin estado: dibuja BorradorUiState y avisa cuando cambia el texto.
 // No sabe que existe un archivo.
@@ -61,4 +63,15 @@ fun PantallaBorradorVacioPreview() {
     MvvmLabTheme {
         PantallaBorrador(BorradorUiState(mensaje = "Todavía no hay borrador guardado"), {})
     }
+}
+
+// --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
+@Composable
+fun PantallaBorradorConViewModel(viewModel: BorradorViewModel, modifier: Modifier = Modifier) {
+    val estado by viewModel.uiState.collectAsStateWithLifecycle()
+    PantallaBorrador(
+        estado = estado,
+        onTextoChange = viewModel::onTextoChange,
+        modifier = modifier
+    )
 }

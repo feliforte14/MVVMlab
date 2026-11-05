@@ -22,6 +22,33 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── ArchivoTextoRepository.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── ResultadoLectura.kt
+ │   ├── repository/
+ │   │   ├── BorradorRepository.kt
+ ├── presentation/
+ │   ├── borrador/
+ │   │   ├── BorradorUiState.kt
+ │   │   ├── BorradorViewModel.kt
+ │   │   ├── PantallaBorrador.kt
+```
+
 ## Consigna
 
 Crear `ArchivoTextoRepository` para leer `borrador.txt` desde `filesDir`. Si no existe, devolver texto vacío o un resultado
@@ -34,9 +61,9 @@ composable. Distinguir archivo inexistente de una falla real; `Dispatchers.IO`; 
 
 | Archivo | Capa | Contenido |
 |---|---|---|
-| `BorradorRepository.kt` | Datos | `sealed interface ResultadoLectura` (`NoExiste` / `Leido`), `interface BorradorRepository`, `ArchivoTextoRepository(carpeta: File)` |
-| `BorradorViewModel.kt` | ViewModel | `BorradorUiState`, `BorradorViewModel` (lee en `init`), `Factory` con `viewModelFactory` |
-| `PantallaBorrador.kt` | View | Editor sin estado + 2 previews |
+| `domain/repository/BorradorRepository.kt + data/repository/ArchivoTextoRepository.kt` | Datos | `sealed interface ResultadoLectura` (`NoExiste` / `Leido`), `interface BorradorRepository`, `ArchivoTextoRepository(carpeta: File)` |
+| `presentation/borrador/BorradorViewModel.kt` | ViewModel | `BorradorUiState`, `BorradorViewModel` (lee en `init`), `Factory` con `viewModelFactory` |
+| `presentation/borrador/PantallaBorrador.kt` | View | Editor sin estado + 2 previews |
 | `MainActivity.kt` | — | `by viewModels { BorradorViewModel.Factory }` |
 
 ## Decisión documentada

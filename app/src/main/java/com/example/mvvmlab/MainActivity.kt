@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.presentation.borrador.BorradorViewModel
+import com.example.mvvmlab.presentation.borrador.PantallaBorradorConViewModel
 
 class MainActivity : ComponentActivity() {
 
