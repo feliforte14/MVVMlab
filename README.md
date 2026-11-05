@@ -1,0 +1,102 @@
+# MvvmLab
+
+Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
+Kotlin + Jetpack Compose + Material 3. Una app de notas que va creciendo ejercicio a ejercicio,
+separando responsabilidades con **MVVM** y un **Repository** que termina leyendo y escribiendo archivos.
+
+📄 Apuntes completos (teoría + resolución de cada ejercicio): [`apuntes/Apuntes_MVVM.pdf`](apuntes/Apuntes_MVVM.pdf)
+
+## Ramas
+
+Cada ejercicio vive en su propia rama, creada a partir de la anterior.
+
+| Rama | Ejercicio | Estado |
+|---|---|---|
+| `main` | Proyecto base (Empty Activity Compose) | — |
+| `ej01-responsabilidades` | 1 — ¿Quién está haciendo demasiado? | ✅ |
+| `ej02-estado-pantalla` | 2 — Una pantalla no es su estado | ✅ |
+
+---
+
+## Ejercicio 1 — ¿Quién está haciendo demasiado?
+
+**Archivo:** `Ej01PantallaTareas.kt` — pantalla de tareas con todo mezclado, *a propósito*, para analizarla.
+
+| Letra | Código | Dónde va |
+|---|---|---|
+| (A) | `var texto` (borrador) | ViewModel |
+| (B) | `var tareas` (dato real) | Repository |
+| (C) | `var error` | ViewModel |
+| (D) | `Column`, `Text`, `OutlinedTextField` | View |
+| (E) | `texto.isBlank()` (regla) | ViewModel |
+| (F) | `tareas.contains(texto)` (regla) | ViewModel |
+| (G) | `tareas = tareas + texto` | Repository |
+| (H) | `File(...).writeText(...)` | Repository |
+| (I) | `texto = ""` | ViewModel |
+| (J) | `error?.let { Text(it, Color.Red) }` | View |
+| (K) | `LazyColumn` | View |
+
+**UDF:** los **eventos suben** (View → ViewModel → Repository) y el **estado baja** (ViewModel → View).
+
+---
+
+## Ejercicio 2 — Una pantalla no es su estado
+
+**Archivo:** `Ej02PantallaNota.kt`
+
+Pantalla de notas con **título**, **contenido** y botón **Guardar** (guardado *simulado* con `delay`).
+Todavía **sin ViewModel**: el objetivo es que la pantalla se pueda dibujar a partir de **un único estado**.
+
+### Estado de pantalla
+
+```kotlin
+data class NotaUiState(
+    val titulo: String = "",          // lo escrito en el campo título
+    val contenido: String = "",       // lo escrito en el campo contenido
+    val error: String? = null,        // error de validación (null = sin error)
+    val guardando: Boolean = false,   // operación en curso
+    val guardada: Nota? = null        // última nota guardada (null = ninguna)
+)
+```
+
+- Todos los campos son `val`: para cambiar el estado se crea uno nuevo con `copy(...)`.
+- `hayCambiosSinGuardar` es una **propiedad calculada**: se deduce de los otros campos, no se duplica.
+
+### Tabla evento → cambio de estado (desafío)
+
+| Evento | Cambio de estado esperado |
+|---|---|
+| Edita el **título** | `titulo = nuevo`, `error = null` (el error deja de tener sentido al escribir) |
+| Edita el **contenido** | `contenido = nuevo` |
+| Pulsa **Guardar** con título vacío | `error = "El título no puede estar vacío"` |
+| Pulsa **Guardar** con título válido | `guardando = true`, `error = null` |
+| Pulsa **Guardar** mientras ya guarda | sin cambios (se ignora; además el botón está deshabilitado) |
+| **Termina** el guardado simulado | `guardando = false`, `guardada = Nota(titulo, contenido)` |
+
+### Estructura del código
+
+| Pieza | Rol |
+|---|---|
+| `Nota` | Modelo: una nota ya guardada |
+| `NotaUiState` | Estado de pantalla: **qué** se ve |
+| `alEditarTitulo`, `alEditarContenido`, `alPulsarGuardar`, `alTerminarGuardado` | Funciones Kotlin puras *estado → nuevo estado*. No conocen Compose; en el Ej 3 pasan al ViewModel |
+| `PantallaNotaConEstado` | Dueño del estado (provisorio) y del guardado simulado |
+| `PantallaNota` | View **sin estado**: dibuja `NotaUiState` y avisa eventos por callbacks (*state hoisting*) |
+| 4 `@Preview` | Vacía · Error · Guardando · Guardada con cambios sin guardar |
+
+### Preguntas de la guía
+
+**¿El texto ingresado es lo mismo que la nota ya guardada?**
+No. `titulo`/`contenido` son lo que el usuario **está escribiendo** (puede cambiar en cada tecla);
+`guardada` es la **última versión confirmada**. Por eso son campos distintos, y la diferencia entre ambos
+es justamente lo que permite mostrar "Hay cambios sin guardar".
+
+**¿Conviene mostrar el mensaje de error como parte del estado?**
+Sí. Si el error está en el estado, la pantalla se puede reconstruir completa a partir de `NotaUiState`
+(UI = f(estado)): sobrevive a la recomposición, se puede previsualizar y, en el Ej 3, también a la
+rotación. Si fuera un mensaje "suelto" (un Toast disparado desde el botón), no habría forma de saber
+si se está mostrando ni de recuperarlo.
+
+### Criterio de finalización
+- ✅ Eventos reconocibles: `onTituloChange`, `onContenidoChange`, `onGuardar`.
+- ✅ La pantalla se representa a partir de un único estado definido (`NotaUiState`): lo demuestran las 4 previews, que dibujan cualquier situación sin ejecutar la app.

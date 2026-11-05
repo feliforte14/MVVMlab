@@ -186,5 +186,112 @@ Es decir, todo lo que va en ViewModel y Repository.</p>
   <tr><td><code>@Preview</code> / <code>@Composable</code></td><td>Anotaciones: “etiquetas” que siempre se aplican a una función. Solas, sin función debajo, no compilan.</td></tr>
 </table>
 
+
+<h2 class="salto">Ejercicio 2 — Una pantalla no es su estado</h2>
+
+<p><strong>Consigna:</strong> pantalla de notas con título, contenido y botón Guardar. Definir una <code>data class</code> de estado
+de pantalla con el contenido actual, el error de validación y si hay una operación en curso. Simular el guardado.
+Identificar eventos separados para editar el título, editar el texto y pulsar Guardar. Todavía <strong>sin ViewModel</strong>.
+<br>Archivo: <code>Ej02PantallaNota.kt</code> · Rama: <code>ej02-estado-pantalla</code></p>
+
+<div class="caja clave">
+  <strong class="titulo">Estado de pantalla (UiState)</strong>
+  Una sola “foto” de todo lo que la pantalla necesita para dibujarse. En el Ej 1 había 3 variables sueltas;
+  ahora todo está junto en un objeto. <strong>Si sabés el estado, sabés exactamente qué se ve.</strong>
+</div>
+
+<div class="bloque">
+<h3>El estado</h3>
+<pre>data class Nota(val titulo: String, val contenido: String)   // una nota YA guardada
+
+data class NotaUiState(
+    val titulo: String = "",          // lo escrito en el campo título
+    val contenido: String = "",       // lo escrito en el campo contenido
+    val error: String? = null,        // error de validación (null = sin error)
+    val guardando: Boolean = false,   // operación en curso
+    val guardada: Nota? = null        // última nota guardada (null = ninguna)
+) {
+    val hayCambiosSinGuardar: Boolean get() = ...   // propiedad CALCULADA
+}</pre>
+</div>
+
+<table>
+  <tr><th style="width:30%">Elemento Kotlin</th><th>Por qué se usa</th></tr>
+  <tr><td><code>data class</code></td><td>Clase pensada para representar datos: genera <code>equals</code>, <code>toString</code> y <code>copy</code>.</td></tr>
+  <tr><td>Campos <code>val</code> + <code>copy(...)</code></td><td>El estado es inmutable: para cambiarlo se crea una copia nueva con los campos modificados. Cada cambio es un estado nuevo y Compose detecta que tiene que redibujar.</td></tr>
+  <tr><td><code>String?</code> / <code>Nota?</code></td><td>Tipo anulable: el error o la nota guardada pueden no existir (<code>null</code>).</td></tr>
+  <tr><td>Valores por defecto (<code>= ""</code>)</td><td><code>NotaUiState()</code> ya es el estado inicial: pantalla vacía.</td></tr>
+  <tr><td>Propiedad calculada (<code>get() = ...</code>)</td><td>Se deduce de otros campos en vez de guardarse: no hay información duplicada que pueda quedar desincronizada.</td></tr>
+</table>
+
+<div class="bloque">
+<h3>Desafío: tabla evento → cambio de estado (antes de codificar)</h3>
+<table>
+  <tr><th style="width:38%">Evento</th><th>Cambio de estado esperado</th></tr>
+  <tr><td>Edita el <strong>título</strong></td><td><code>titulo = nuevo</code>, <code>error = null</code> (el error deja de tener sentido al escribir)</td></tr>
+  <tr><td>Edita el <strong>contenido</strong></td><td><code>contenido = nuevo</code></td></tr>
+  <tr><td>Pulsa <strong>Guardar</strong> con título vacío</td><td><code>error = "El título no puede estar vacío"</code></td></tr>
+  <tr><td>Pulsa <strong>Guardar</strong> con título válido</td><td><code>guardando = true</code>, <code>error = null</code></td></tr>
+  <tr><td>Pulsa <strong>Guardar</strong> mientras ya guarda</td><td>Sin cambios: se ignora (y el botón está deshabilitado)</td></tr>
+  <tr><td><strong>Termina</strong> el guardado simulado</td><td><code>guardando = false</code>, <code>guardada = Nota(titulo, contenido)</code></td></tr>
+</table>
+</div>
+
+<div class="bloque">
+<h3>Cómo quedó organizado el código</h3>
+<table>
+  <tr><th style="width:38%">Pieza</th><th>Rol</th></tr>
+  <tr><td><code>Nota</code></td><td>Modelo: una nota ya guardada.</td></tr>
+  <tr><td><code>NotaUiState</code></td><td>Estado de pantalla: <strong>qué</strong> se ve.</td></tr>
+  <tr><td><code>alEditarTitulo</code>, <code>alEditarContenido</code>, <code>alPulsarGuardar</code>, <code>alTerminarGuardado</code></td><td>Funciones Kotlin <strong>puras</strong>: reciben el estado actual y devuelven el nuevo. No conocen Compose. En el Ej 3 se mudan al ViewModel casi sin cambios.</td></tr>
+  <tr><td><code>PantallaNotaConEstado</code></td><td>Dueño del estado (provisorio, hasta el Ej 3) y del guardado simulado con <code>delay</code>.</td></tr>
+  <tr><td><code>PantallaNota</code></td><td>View <strong>sin estado</strong>: dibuja el <code>NotaUiState</code> que recibe y avisa los eventos por callbacks.</td></tr>
+  <tr><td>4 <code>@Preview</code></td><td>Vacía · Error · Guardando · Guardada con cambios sin guardar.</td></tr>
+</table>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">State hoisting (elevar el estado)</strong>
+  <pre style="background:#fff">@Composable
+fun PantallaNota(
+    estado: NotaUiState,                  // el estado BAJA
+    onTituloChange: (String) -&gt; Unit,     // los eventos SUBEN
+    onContenidoChange: (String) -&gt; Unit,
+    onGuardar: () -&gt; Unit,
+    modifier: Modifier = Modifier
+)</pre>
+  La View no guarda ni decide nada: recibe un valor y funciones (callbacks) para avisar.
+  <strong>Ventaja concreta:</strong> como no tiene estado propio, se puede previsualizar en <em>cualquier</em> situación
+  pasándole un <code>NotaUiState</code> armado a mano. Es el mismo UDF del Ej 1, ahora en código.
+</div>
+
+<div class="caja clave">
+  <strong class="titulo">Lambdas y tipos función</strong>
+  <code>(String) -&gt; Unit</code> = “una función que recibe un String y no devuelve nada”. Se pasa como parámetro:
+  <code>onTituloChange = { estado = alEditarTitulo(estado, it) }</code>. Dentro de la lambda, <code>it</code> es el único parámetro (el texto nuevo).
+</div>
+
+<div class="caja ojo">
+  <strong class="titulo">Guardado simulado: corrutina</strong>
+  <code>rememberCoroutineScope()</code> + <code>scope.launch { delay(1500); ... }</code> espera 1,5 s <em>sin congelar la pantalla</em>.
+  Mientras tanto <code>guardando = true</code> → el botón muestra “Guardando...” y queda deshabilitado (<code>enabled = !estado.guardando</code>),
+  lo que evita la doble pulsación. En el Ej 3 esto pasa a <code>viewModelScope</code>.
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿El texto ingresado es lo mismo que la nota ya guardada?</strong><br>
+No. <code>titulo</code>/<code>contenido</code> son lo que el usuario <strong>está escribiendo</strong> (cambia en cada tecla); <code>guardada</code> es la
+<strong>última versión confirmada</strong>. Por eso son campos distintos, y comparar ambos es lo que permite mostrar “Hay cambios sin guardar”.</p>
+<p><strong>2. ¿Conviene mostrar el mensaje de error como parte del estado?</strong><br>
+Sí. Si el error está en el estado, la pantalla se reconstruye completa a partir de <code>NotaUiState</code> (UI = f(estado)): sobrevive a la
+recomposición, se puede previsualizar y, con ViewModel (Ej 3), también a la rotación. Un mensaje “suelto” disparado desde el botón (un Toast)
+no se puede consultar ni recuperar.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Criterio de finalización</strong>
+  ✅ Eventos reconocibles: <code>onTituloChange</code>, <code>onContenidoChange</code>, <code>onGuardar</code>.<br>
+  ✅ La pantalla se representa a partir de un único estado (<code>NotaUiState</code>): lo prueban las 4 previews, que dibujan cualquier situación sin ejecutar la app.
+</div>
+
 </body>
 </html>
