@@ -1511,5 +1511,118 @@ el desafío: escribir en <code>.tmp</code> y renombrar recién cuando está comp
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 11 — Dependencias: ¿quién crea el Repository?</h2>
+<p><strong>Consigna:</strong> revisar dónde se construyen el Repository y el ViewModel. Crear una forma sencilla de suministrar la dependencia desde la capa
+de aplicación (una fábrica explícita alcanza). El ViewModel debe recibir el contrato, no crear un archivo usando un Context tomado de la UI. Si se usa
+<code>AndroidViewModel</code>, justificar. <strong>Desafío:</strong> alternar entre Repository en memoria y de archivos mediante una única decisión de configuración.
+<br>Rama: <code>ej11-dependencias</code> · Archivos nuevos: <code>ContenedorApp.kt</code>, <code>NotaRepositoryEnMemoria.kt</code></p>
+
+<h3>Paso 0 · ¿Dónde se construía todo hasta ahora?</h3>
+<table>
+  <tr><th style="width:18%">Ejercicio</th><th>Quién creaba el Repository</th><th style="width:34%">Problema</th></tr>
+  <tr><td>Ej 6</td><td>Valor por defecto en el constructor del ViewModel</td><td>El ViewModel elegía su propia implementación</td></tr>
+  <tr><td>Ej 7–10</td><td>La fábrica de cada ViewModel: <code>ArchivoNotasRepository(app.filesDir)</code></td><td>Cada fábrica crea <em>su</em> Repository: con dos ViewModels habría dos instancias distintas</td></tr>
+</table>
+
+<div class="caja clave">
+  <strong class="titulo">Inyección de dependencias (a mano)</strong>
+  Una pieza <strong>no crea</strong> lo que necesita: lo <strong>recibe</strong> (por constructor). Otro lugar, uno solo, se encarga de construir y
+  conectar las piezas. Hilt o Koin automatizan esto; acá se hace “a mano” con un <strong>contenedor</strong>, que alcanza para una app chica.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · El contenedor y la única decisión de configuración</h3>
+<pre>enum class OrigenDatos { MEMORIA, ARCHIVO }
+
+class ContenedorApp(private val app: Application) {
+
+    val origenDatos: OrigenDatos = OrigenDatos.ARCHIVO      // ← ÚNICA decisión (desafío)
+
+    val notaRepository: NotaRepository by lazy {
+        when (origenDatos) {
+            OrigenDatos.MEMORIA -&gt; NotaRepositoryEnMemoria()
+            OrigenDatos.ARCHIVO -&gt; ArchivoNotasRepository(app.filesDir)
+        }
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>enum class</code></strong>: un tipo con un conjunto fijo de valores. El <code>when</code> es exhaustivo.</li>
+  <li><strong><code>by lazy { }</code></strong>: se construye la primera vez que alguien lo pide y después devuelve <strong>siempre la misma instancia</strong>.
+  No se crea en cada recomposición ni en cada ViewModel.</li>
+  <li>El tipo declarado es <code>NotaRepository</code> (el contrato): quien lo use no sabe cuál de las dos implementaciones recibió.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · ¿Dónde vive el contenedor? En la <code>Application</code></h3>
+<pre>class MvvmLabApp : Application() {
+    lateinit var contenedor: ContenedorApp
+        private set
+    override fun onCreate() {
+        super.onCreate()
+        contenedor = ContenedorApp(this)
+    }
+}
+
+&lt;!-- AndroidManifest.xml --&gt;
+&lt;application android:name=".MvvmLabApp" ...&gt;</pre>
+</div>
+<p>Android crea la <code>Application</code> <strong>antes que cualquier Activity</strong> y la mantiene mientras viva el proceso: es la “capa de aplicación”.
+Una Activity se destruye al rotar; la Application no. <code>lateinit var</code> = “se inicializa después (en <code>onCreate</code>), pero antes de usarse”.</p>
+
+<div class="bloque">
+<h3>Paso 3 · La fábrica pide, no construye</h3>
+<pre>val Factory: ViewModelProvider.Factory = viewModelFactory {
+    initializer {
+        val app = checkNotNull(this[APPLICATION_KEY]) as MvvmLabApp
+        NotasViewModel(app.contenedor.notaRepository)     // recibe el CONTRATO ya armado
+    }
+}</pre>
+</div>
+<p><code>NotasViewModel</code>, <code>PantallaNotas</code> y <code>MainActivity</code> no cambiaron: el ViewModel ya recibía <code>NotaRepository</code> por constructor. Lo único que
+cambió es <strong>quién</strong> lo construye.</p>
+<div class="caja ojo">
+  <strong class="titulo">¿Y <code>AndroidViewModel</code>?</strong>
+  <code>AndroidViewModel</code> es un ViewModel que recibe el <code>Application</code> (y por lo tanto un <code>Context</code>). <strong>No se usa</strong>: este ViewModel no
+  necesita Context para nada; solo lo usaríamos para construir el Repository adentro, que es justamente lo que queremos evitar. Además, un ViewModel
+  sin Context se prueba con JUnit puro (Ej 13).
+</div>
+
+<h3>Diagrama</h3>
+<pre>MvvmLabApp (Application, 1 vez)
+  └─ ContenedorApp ── origenDatos = ARCHIVO
+        └─ notaRepository (by lazy, UNA instancia) : NotaRepository
+              └─ NotasViewModel.Factory ──► NotasViewModel(repositorio)
+                                                 └─ PantallaNotas (estado ↓ / eventos ↑)</pre>
+
+<h3>Pruebas en el emulador (desafío)</h3>
+<table>
+  <tr><th style="width:40%">Configuración</th><th>Resultado</th></tr>
+  <tr><td><code>OrigenDatos.ARCHIVO</code></td><td>Muestra las 2 notas que ya estaban en <code>notas.json</code> ✅</td></tr>
+  <tr><td>Cambiar <em>una línea</em> a <code>OrigenDatos.MEMORIA</code></td><td>Arranca sin notas; se agrega una → “Notas guardadas (1)” ✅</td></tr>
+  <tr><td><code>MEMORIA</code> + <code>force-stop</code> y reabrir</td><td>Sin notas: la memoria se perdió con el proceso ✅</td></tr>
+  <tr><td>Volver a <code>ARCHIVO</code></td><td>Las 2 notas del archivo siguen ahí (nunca se tocaron) ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué se ganaría al reemplazar el Repository sin tocar el ViewModel?</strong><br>
+Que el ViewModel (y su lógica: validaciones, estados de carga, errores) queda probado y estable aunque cambie el almacenamiento: memoria → archivo →
+Room → red. Se puede usar uno en memoria para desarrollar, uno falso para tests (Ej 13) y el real en la app, cambiando una sola línea.</p>
+<p><strong>2. ¿Qué instancia debe compartir la app?</strong><br>
+<strong>Una sola instancia de cada Repository</strong> para toda la app. Si cada ViewModel creara el suyo: con <code>NotaRepositoryEnMemoria</code> cada uno tendría
+<em>su propia lista</em> (dos pantallas mostrarían datos distintos); con <code>ArchivoNotasRepository</code> cada uno tendría <em>su propio Mutex</em>, y dos
+escrituras simultáneas podrían pisarse. Una instancia = una fuente de verdad. Los ViewModels, en cambio, son uno por pantalla.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Las piezas reciben sus dependencias; el contenedor las construye en un solo lugar.</li>
+    <li>El contenedor vive en la <code>Application</code> (capa de aplicación, una vez por proceso).</li>
+    <li><code>by lazy</code>: una única instancia de Repository compartida.</li>
+    <li>La fábrica pide el contrato al contenedor; el ViewModel no sabe cuál recibe.</li>
+    <li>Cambiar de origen de datos = una línea (<code>origenDatos</code>).</li>
+  </ol>
+</div>
+
 </body>
 </html>

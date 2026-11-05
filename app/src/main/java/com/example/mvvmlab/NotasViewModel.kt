@@ -141,10 +141,14 @@ class NotasViewModel(
     companion object {
         private const val TAG = "NotasViewModel"
 
+        // Ej 11: la fabrica ya NO decide que Repository usar ni lo construye:
+        // se lo pide al contenedor de la app. El ViewModel recibe el CONTRATO.
+        // (No se usa AndroidViewModel: el ViewModel no necesita Context para
+        //  nada; solo necesitaba el Repository, y ahora se lo dan hecho.)
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app = checkNotNull(this[APPLICATION_KEY])
-                NotasViewModel(ArchivoNotasRepository(app.filesDir))
+                val app = checkNotNull(this[APPLICATION_KEY]) as MvvmLabApp
+                NotasViewModel(app.contenedor.notaRepository)
             }
         }
     }
