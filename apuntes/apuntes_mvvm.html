@@ -1771,5 +1771,138 @@ Android restaura si recrea la pila. También qué pantalla está abierta (la pil
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 13 — Probar el ViewModel sin Android ni archivos</h2>
+<p><strong>Consigna:</strong> construir un Repository falso para pruebas, con datos prefijados y posibilidad de provocar una falla. Escribir pruebas del ViewModel
+para carga inicial, validación, guardado correcto y error de escritura. Si hacen falta controladores de corrutinas de prueba, incorporarlos justificando su función.
+<strong>Desafío:</strong> verificar que una solicitud inválida nunca invoca guardar.
+<br>Rama: <code>ej13-tests</code> · Archivos (en <code>app/src/test/</code>): <code>FakeNotaRepository.kt</code>, <code>MainDispatcherRule.kt</code>, <code>NotasViewModelTest.kt</code></p>
+
+<h3>Paso 0 · ¿Por qué ahora se puede?</h3>
+<p>Todo lo hecho desde el Ej 6 lo permite: los ViewModels reciben el <strong>contrato</strong> por constructor (Ej 6/11), no tocan Context ni archivos (Ej 7/11)
+y exponen su estado como <code>StateFlow</code> (Ej 4). Entonces un test puede crear el ViewModel con un Repository falso, llamar a sus eventos y leer
+<code>uiState.value</code>. <strong>Sin emulador y en milisegundos.</strong></p>
+
+<div class="caja clave">
+  <strong class="titulo">Test unitario (JUnit) — PREPARAR → ACTUAR → VERIFICAR</strong>
+  Un método con <code>@Test</code> que arma una situación, ejecuta una acción y comprueba el resultado con <code>assertEquals</code>, <code>assertTrue</code>, etc.
+  Los de <code>src/test</code> corren en la JVM de la computadora (no en el teléfono).
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · El Repository falso</h3>
+<pre>class FakeNotaRepository(notasIniciales: List&lt;Nota&gt; = emptyList()) : NotaRepository {
+    private val notas = MutableStateFlow(notasIniciales)        // datos prefijados
+    var fallarLectura = false                                   // interruptores de falla
+    var fallarEscritura = false
+    val guardadas = mutableListOf&lt;Nota&gt;()                       // registro de llamadas
+
+    override suspend fun guardar(nota: Nota) {
+        if (fallarEscritura) throw IOException("Escritura falsa fallida")
+        guardadas += nota
+        notas.value = notas.value.filterNot { it.id == nota.id } + nota
+    }
+    ...
+}</pre>
+</div>
+<p>Implementa el <strong>mismo contrato</strong> que la app. Tres poderes: datos fijos, fallas a pedido y <strong>registro de llamadas</strong> (<code>guardadas</code>), que
+permite verificar no solo el estado sino <em>qué le pidió</em> el ViewModel al Repository. A esto se le llama <em>fake</em> (doble de prueba).</p>
+
+<div class="bloque">
+<h3>Paso 2 · Controlador de corrutinas de prueba (justificación)</h3>
+<pre>class MainDispatcherRule(
+    private val dispatcher: TestDispatcher = UnconfinedTestDispatcher()
+) : TestWatcher() {
+    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
+    override fun finished(description: Description) = Dispatchers.resetMain()
+}
+
+class NotasViewModelTest {
+    @get:Rule val mainDispatcherRule = MainDispatcherRule()
+    @Test fun ...() = runTest { ... }
+}</pre>
+</div>
+<ul>
+  <li><strong>Por qué hace falta:</strong> <code>viewModelScope</code> lanza sus corrutinas en <code>Dispatchers.Main</code>, el hilo de la interfaz de <em>Android</em>. En la JVM
+  ese hilo no existe y el test falla (“Main dispatcher is missing”). La regla lo reemplaza antes de cada test y lo restaura después.</li>
+  <li><strong><code>UnconfinedTestDispatcher</code></strong> ejecuta las corrutinas en el momento: cuando <code>vm.onGuardar()</code> vuelve, el guardado (falso, sin demoras)
+  ya terminó y se puede verificar.</li>
+  <li><strong><code>runTest { }</code></strong> ejecuta el test dentro de una corrutina de prueba (salta los <code>delay</code>).</li>
+  <li><strong>Dependencia agregada:</strong> <code>kotlinx-coroutines-test 1.9.0</code>, solo para tests (<code>testImplementation</code>), misma versión de corrutinas que ya usa el proyecto.</li>
+  <li><strong><code>unitTests.isReturnDefaultValues = true</code></strong> en Gradle: los ViewModels llaman a <code>android.util.Log</code> al registrar errores; en la JVM esa clase
+  es un “esqueleto” que lanza excepción. Con esta opción devuelve un valor por defecto y el test sigue.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Ejemplos de tests</h3>
+<pre>@Test
+fun detalle_solicitudInvalida_nuncaInvocaGuardar() = runTest {      // DESAFÍO
+    val repo = FakeNotaRepository()                                   // PREPARAR
+    val vm = DetalleNotaViewModel(repo, SavedStateHandle(mapOf("id" to "nueva")))
+    vm.onTituloChange("")
+    vm.onContenidoChange("corto")
+
+    vm.onGuardar(); vm.onGuardar()                                    // ACTUAR (aunque se insista)
+
+    assertTrue(repo.guardadas.isEmpty())                              // VERIFICAR
+    assertFalse(vm.uiState.value.guardadoOk)
+}
+
+@Test
+fun detalle_siFallaLaEscritura_muestraErrorYConservaLoEscrito() = runTest {
+    val repo = FakeNotaRepository().apply { fallarEscritura = true }
+    val vm = detalle(repo)
+    vm.onTituloChange("Parcial"); vm.onContenidoChange("Contenido de prueba")
+    vm.onGuardar()
+    assertNotNull(vm.uiState.value.errorOperacion)
+    assertFalse(vm.uiState.value.guardadoOk)           // no navega como si hubiera guardado
+    assertEquals("Parcial", vm.uiState.value.titulo)   // el usuario no pierde lo escrito
+}</pre>
+</div>
+<p><code>SavedStateHandle(mapOf("id" to "nueva"))</code> simula el argumento de navegación: es una clase común, se crea a mano en el test.
+<code>.apply { fallarEscritura = true }</code> configura el objeto recién creado.</p>
+
+<h3>Resultado: 14 pruebas repetibles</h3>
+<table>
+  <tr><th style="width:52%">Test (<code>NotasViewModelTest</code>)</th><th>Área</th><th>Resultado</th></tr>
+  <tr><td><code>lista_cargaInicial_muestraLasNotasDelRepository</code></td><td>Carga inicial</td><td>✅</td></tr>
+  <tr><td><code>lista_siLaLecturaFalla_muestraErrorYNoSeCierra</code></td><td>Carga inicial (error)</td><td>✅</td></tr>
+  <tr><td><code>detalle_conId_cargaLaNotaEnElFormulario</code></td><td>Carga inicial</td><td>✅</td></tr>
+  <tr><td><code>detalle_tituloVacio_muestraErrorDelCampo</code></td><td>Validación</td><td>✅</td></tr>
+  <tr><td><code>detalle_solicitudInvalida_nuncaInvocaGuardar</code></td><td>Validación (desafío)</td><td>✅</td></tr>
+  <tr><td><code>detalle_notaValida_seGuardaYAvisaQueTermino</code></td><td>Guardado correcto</td><td>✅</td></tr>
+  <tr><td><code>guardarEnElDetalle_actualizaLaLista_unaSolaFuenteDeVerdad</code></td><td>Guardado (Ej 12)</td><td>✅</td></tr>
+  <tr><td><code>detalle_siFallaLaEscritura_muestraErrorYConservaLoEscrito</code></td><td>Error de escritura</td><td>✅</td></tr>
+  <tr><td><code>lista_siFallaEliminar_muestraErrorYConservaLaNota</code></td><td>Error de escritura</td><td>✅</td></tr>
+  <tr><td>+ 5 de <code>ValidadorNotaTest</code> (Ej 5)</td><td>Reglas</td><td>✅</td></tr>
+</table>
+<div class="caja ojo">
+  <strong class="titulo">¿Los tests detectan errores de verdad? (prueba de mutación)</strong>
+  Se desactivó a propósito la validación en <code>DetalleNotaViewModel</code> (<code>if (false &amp;&amp; errores.hayErrores)</code>) y se corrieron los tests:
+  <strong>14 ejecutados, 2 fallaron</strong> (<code>tituloVacio</code> y <code>nuncaInvocaGuardar</code>). Se restauró el código y vuelven a pasar los 14.
+  Un test que nunca puede fallar no prueba nada.
+</div>
+<p>Ejecutar: click derecho sobre <code>NotasViewModelTest</code> → <em>Run</em>, o <code>./gradlew :app:testDebugUnitTest</code> (reporte en
+<code>app/build/reports/tests/testDebugUnitTest/index.html</code>). Ninguno abre la pantalla.</p>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué prueba quedaría innecesariamente difícil si el ViewModel creara su propio Repository?</strong><br>
+<strong>Todas</strong>, y en especial las de error: para probar “si falla la escritura, se muestra un error” habría que hacer fallar un archivo real (llenar el disco,
+cambiar permisos) y correr en un emulador. Con el Repository inyectado alcanza con <code>fallarEscritura = true</code>. Lo mismo para verificar que “nunca se invoca
+guardar”: sin un fake que registre las llamadas, habría que revisar el archivo.</p>
+<p><strong>2. ¿Qué sí habría que probar en una prueba de integración con archivo real?</strong><br>
+Lo que el fake no cubre: que <code>ArchivoNotasRepository</code> escribe y vuelve a leer el JSON correctamente (tildes, saltos de línea, comillas, <code>;</code>), que un
+archivo truncado produce <code>FormatoInvalidoException</code>, que la escritura con temporal + renombrado no deja el archivo a medias, y que los datos sobreviven a
+reiniciar la app. Eso va en <code>src/androidTest</code> (en el dispositivo) o con una carpeta temporal (<code>TemporaryFolder</code> de JUnit).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Fake del contrato: datos fijos, fallas a pedido, registro de llamadas.</li>
+    <li><code>MainDispatcherRule</code> + <code>runTest</code>: reemplazan el hilo principal de Android en la JVM.</li>
+    <li>Tests de carga, validación, guardado y error; ninguno abre la pantalla.</li>
+    <li>Prueba de mutación: romper el código a propósito confirma que los tests fallan.</li>
+  </ol>
+</div>
+
 </body>
 </html>

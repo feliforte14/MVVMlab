@@ -33,6 +33,12 @@ android {
     buildFeatures {
         compose = true
     }
+    // Ej 13: en los tests JVM, las llamadas a android.util.Log (que usan los
+    // ViewModels al registrar errores) devuelven un valor por defecto en vez
+    // de lanzar "Method ... not mocked".
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -50,6 +56,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     testImplementation(libs.junit)
+    // Ej 13: controlar corrutinas en tests (runTest, Dispatchers.setMain)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
