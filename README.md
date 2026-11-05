@@ -19,6 +19,31 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ ├── presentation/
+ │   ├── nota/
+ │   │   ├── NotaUiState.kt
+ │   │   ├── NotaViewModel.kt
+ │   │   ├── PantallaNota.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── ExampleUnitTest.kt
+```
+
 ## Consigna
 
 Exponer desde el ViewModel un `StateFlow` de sólo lectura y mantener mutable su implementación. En Compose
@@ -29,9 +54,9 @@ recolectarlo con `collectAsStateWithLifecycle`. Hacer que editar un campo cambie
 
 | Archivo | Capa | Cambio respecto del Ej 3 |
 |---|---|---|
-| `NotaViewModel.kt` | ViewModel | `mutableStateOf` → `MutableStateFlow` privado + `StateFlow` público; eventos con `update { }`; logs |
-| `NotaUiState.kt` | Estado | Sin cambios |
-| `PantallaNota.kt` | View | Sin cambios |
+| `presentation/nota/NotaViewModel.kt` | ViewModel | `mutableStateOf` → `MutableStateFlow` privado + `StateFlow` público; eventos con `update { }`; logs |
+| `presentation/nota/NotaUiState.kt` | Estado | Sin cambios |
+| `presentation/nota/PantallaNota.kt` | View | Sin cambios |
 | `gradle/libs.versions.toml`, `app/build.gradle.kts` | — | Dependencia `lifecycle-runtime-compose` 2.10.0 (misma versión de lifecycle que ya usaba el proyecto) |
 
 ## Puntos clave

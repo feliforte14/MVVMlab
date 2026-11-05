@@ -1,15 +1,6 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.nota
 
-// =====================================================================
-// MODELO Y ESTADO DE PANTALLA
-// (vienen del Ej 2; en el Ej 3 no cambian, solo cambia quien es su dueño)
-// =====================================================================
-
-// Una nota YA GUARDADA. No es lo mismo que lo que se esta escribiendo.
-data class Nota(
-    val titulo: String,
-    val contenido: String
-)
+import com.example.mvvmlab.domain.model.Nota
 
 // "Foto" de todo lo que la pantalla necesita para dibujarse.
 // Campos val (inmutables): para cambiar el estado se crea una copia con copy(...).
