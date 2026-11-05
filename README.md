@@ -86,7 +86,7 @@ app/src/test/java/com/example/mvvmlab/
 Pantalla de notas con **título**, **contenido** y botón **Guardar** (guardado *simulado* con `delay`).
 Todavía **sin ViewModel**: el objetivo es que la pantalla se pueda dibujar a partir de **un único estado**.
 
-### Estado de pantalla
+## 📋 Estado de pantalla
 
 ```kotlin
 data class NotaUiState(
@@ -101,7 +101,7 @@ data class NotaUiState(
 - Todos los campos son `val`: para cambiar el estado se crea uno nuevo con `copy(...)`.
 - `hayCambiosSinGuardar` es una **propiedad calculada**: se deduce de los otros campos, no se duplica.
 
-### Tabla evento → cambio de estado (desafío)
+## 📋 Tabla evento → cambio de estado (desafío)
 
 | Evento | Cambio de estado esperado |
 |---|---|
@@ -112,7 +112,7 @@ data class NotaUiState(
 | Pulsa **Guardar** mientras ya guarda | sin cambios (se ignora; además el botón está deshabilitado) |
 | **Termina** el guardado simulado | `guardando = false`, `guardada = Nota(titulo, contenido)` |
 
-### Estructura del código
+## 📋 Estructura del código
 
 | Pieza | Rol |
 |---|---|
@@ -123,7 +123,7 @@ data class NotaUiState(
 | `PantallaNota` | View **sin estado**: dibuja `NotaUiState` y avisa eventos por callbacks (*state hoisting*) |
 | 4 `@Preview` | Vacía · Error · Guardando · Guardada con cambios sin guardar |
 
-### Preguntas de la guía
+## ❓ Preguntas de la guía
 
 **¿El texto ingresado es lo mismo que la nota ya guardada?**
 No. `titulo`/`contenido` son lo que el usuario **está escribiendo** (puede cambiar en cada tecla);
@@ -136,7 +136,7 @@ Sí. Si el error está en el estado, la pantalla se puede reconstruir completa a
 rotación. Si fuera un mensaje "suelto" (un Toast disparado desde el botón), no habría forma de saber
 si se está mostrando ni de recuperarlo.
 
-### Criterio de finalización
+## ✅ Criterio de finalización
 - ✅ Eventos reconocibles: `onTituloChange`, `onContenidoChange`, `onGuardar`.
 - ✅ La pantalla se representa a partir de un único estado definido (`NotaUiState`): lo demuestran las 4 previews, que dibujan cualquier situación sin ejecutar la app.
 <!-- /ejercicio -->
