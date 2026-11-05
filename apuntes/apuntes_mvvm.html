@@ -1,0 +1,2198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Apuntes MVVM – DA1</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root { --azul:#1d3a8a; --azul-claro:#eef2fb; --verde:#1f6b3a; --verde-claro:#eef7f0;
+          --ambar:#7a5a00; --ambar-claro:#fff8e1; --gris:#555; --borde:#cfd6e4; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt;
+         line-height: 1.45; color: #1a1a1a; background:#fff; margin:0; }
+  header.portada { border-bottom: 3px solid var(--azul); padding-bottom: 10px; margin-bottom: 18px; }
+  header.portada h1 { margin:0; font-size: 20pt; color: var(--azul); }
+  header.portada p { margin: 4px 0 0; color: var(--gris); }
+  h2 { font-size: 15pt; color: var(--azul); margin: 22px 0 6px; border-bottom: 1px solid var(--borde); padding-bottom: 4px; }
+  h3 { font-size: 11.5pt; margin: 16px 0 6px; }
+  p { margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.8pt; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--borde); padding: 5px 7px; vertical-align: top; text-align: left; }
+  th { background: var(--azul-claro); }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f2f4f8; padding: 0 3px; border-radius: 3px; }
+  pre { font-family: "SF Mono", Menlo, monospace; font-size: 8.4pt; background: #f6f7fa; border: 1px solid var(--borde);
+        border-radius: 6px; padding: 9px 11px; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; page-break-inside: avoid; margin: 8px 0; }
+  .caja { border-radius: 6px; padding: 8px 12px; margin: 10px 0; page-break-inside: avoid; }
+  .clave { background: var(--azul-claro); border-left: 4px solid var(--azul); }
+  .regla { background: var(--verde-claro); border-left: 4px solid var(--verde); }
+  .ojo { background: var(--ambar-claro); border-left: 4px solid var(--ambar); }
+  .caja strong.titulo { display:block; margin-bottom: 3px; }
+  .tag { display:inline-block; padding: 0 6px; border-radius: 10px; font-size: 8.8pt; font-weight: 600; }
+  .v { background:#e3ecff; color:#1d3a8a; } .vm { background:#e5f5ea; color:#1f6b3a; } .r { background:#fff0d6; color:#7a5a00; }
+  ul, ol { margin: 4px 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  .salto { page-break-before: always; }
+  .figs { display:flex; gap:10px; align-items:flex-end; justify-content:center; margin:10px 0; break-inside: avoid; }
+  .figs figure { margin:0; flex:0 0 auto; text-align:center; font-size:8.6pt; color:var(--gris); }
+  .figs img { border:1px solid var(--borde); border-radius:6px; display:block; margin:0 auto 4px; }
+  .bloque { break-inside: avoid; page-break-inside: avoid; }
+  h2, h3 { break-after: avoid; page-break-after: avoid; }
+</style>
+</head>
+<body>
+
+<header class="portada">
+  <h1>Apuntes – MVVM y Repository</h1>
+  <p>Desarrollo de Aplicaciones I · UADE · Guía de Ejercicios: MVVM y Repository (v1.0)</p>
+  <p>Proyecto: <code>MvvmLab</code> · Felipe Forte</p>
+</header>
+
+<h2>Ejercicio 1 — ¿Quién está haciendo demasiado?</h2>
+
+<p><strong>Consigna:</strong> tomar una pantalla donde todo está mezclado, marcar dónde se dibuja la interfaz, dónde se validan
+los datos, dónde se modifica la lista y dónde se guarda, y ubicar cada responsabilidad en
+<em>View</em>, <em>ViewModel</em> o <em>Model/Repository</em>. Todavía <strong>no</strong> se cambia la implementación.</p>
+
+<h3>Conceptos base</h3>
+
+<div class="caja clave">
+  <strong class="titulo">MVVM = separar en 3 responsabilidades</strong>
+  <ul>
+    <li><span class="tag v">View (Compose)</span> <strong>dibuja</strong> el estado y <strong>avisa</strong> lo que hace el usuario (clicks, texto). No decide nada.</li>
+    <li><span class="tag vm">ViewModel</span> <strong>recibe</strong> la acción del usuario, <strong>decide</strong> (valida, coordina) y <strong>expone</strong> el estado de pantalla.</li>
+    <li><span class="tag r">Model / Repository</span> <strong>obtiene y guarda</strong> los datos (memoria, archivo, Room, API). No sabe nada de pantallas.</li>
+  </ul>
+  <p style="margin-bottom:0"><strong>UI = f(estado):</strong> la pantalla es una función del estado.</p>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">¿Cómo decido dónde va cada cosa?</strong>
+  <p>El criterio <strong>no</strong> es “¿declara una variable?” — hay variables en las tres capas. Las preguntas útiles son:</p>
+  <ol>
+    <li><strong>¿Esto dibuja algo?</strong> → View. <em>(Test: si cambio Compose por una web, ¿tengo que reescribir esta línea? Sí → View.)</em></li>
+    <li><strong>¿Es una regla que valdría igual en cualquier interfaz?</strong> → ViewModel.</li>
+    <li><strong>¿Este dato tiene que sobrevivir si cierro la app?</strong> Sí → dato real → Repository. No, solo importa mientras uso la pantalla → estado de pantalla → ViewModel.</li>
+  </ol>
+  <p style="margin-bottom:0"><em>Ejemplo:</em> en WhatsApp, el mensaje que estás escribiendo (borrador) es de la pantalla; los mensajes ya enviados se guardan.</p>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">El ViewModel decide QUÉ mostrar. La View decide CÓMO mostrarlo.</strong>
+  “Hay un error: tarea vacía” → ViewModel. “El error va en rojo, debajo del botón” → View.
+</div>
+
+<div class="bloque"><h3>Código analizado (pantalla “mal hecha a propósito”)</h3>
+<pre>@Composable
+fun PantallaTareas(context: Context, modifier: Modifier = Modifier) {
+    var texto by remember { mutableStateOf("") }                    // (A)
+    var tareas by remember { mutableStateOf(listOf&lt;String&gt;()) }     // (B)
+    var error by remember { mutableStateOf&lt;String?&gt;(null) }         // (C)
+
+    Column(modifier.padding(16.dp)) {                                // (D)
+        Text("Mis tareas (${tareas.size})")
+        OutlinedTextField(value = texto, onValueChange = { texto = it })
+
+        Button(onClick = {
+            if (texto.isBlank()) {                                   // (E)
+                error = "La tarea no puede estar vacía"
+            } else if (tareas.contains(texto)) {                     // (F)
+                error = "Esa tarea ya existe"
+            } else {
+                tareas = tareas + texto                              // (G)
+                File(context.filesDir, "tareas.txt")                 // (H)
+                    .writeText(tareas.joinToString("\n"))
+                texto = ""                                           // (I)
+                error = null
+            }
+        }) { Text("Agregar") }
+
+        error?.let { Text(it, color = Color.Red) }                   // (J)
+        LazyColumn { items(tareas) { Text(it) } }                    // (K)
+    }
+}</pre></div>
+
+<div class="bloque"><h3>Resultado: tabla de responsabilidades (entregable)</h3>
+<table>
+  <tr><th style="width:7%">Letra</th><th style="width:30%">Código</th><th>Qué hace</th><th style="width:16%">Dónde va</th></tr>
+  <tr><td>(A)</td><td><code>var texto</code></td><td>Borrador que escribe el usuario; no sobrevive al cierre</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(B)</td><td><code>var tareas</code></td><td>Lista real de tareas; tiene que sobrevivir al cierre</td><td><span class="tag r">Repository</span></td></tr>
+  <tr><td>(C)</td><td><code>var error</code></td><td>Mensaje de error actual (dato del estado de pantalla)</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(D)</td><td><code>Column</code>, <code>Text</code>, <code>OutlinedTextField</code></td><td>Dibuja la pantalla</td><td><span class="tag v">View</span></td></tr>
+  <tr><td>(E)</td><td><code>texto.isBlank()</code></td><td>Regla: no se agregan tareas vacías</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(F)</td><td><code>tareas.contains(texto)</code></td><td>Regla: no se agregan tareas repetidas</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(G)</td><td><code>tareas = tareas + texto</code></td><td>Agrega la tarea a la lista (el dueño del dato la modifica)</td><td><span class="tag r">Repository</span></td></tr>
+  <tr><td>(H)</td><td><code>File(...).writeText(...)</code></td><td>Guarda las tareas en un archivo</td><td><span class="tag r">Repository</span></td></tr>
+  <tr><td>(I)</td><td><code>texto = ""</code></td><td>Limpia el campo solo si la tarea se agregó bien (decisión sobre un dato del ViewModel)</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(J)</td><td><code>error?.let { Text(it, Color.Red) }</code></td><td>Muestra el error en rojo (el error es del VM; dibujarlo es de la View)</td><td><span class="tag v">View</span></td></tr>
+  <tr><td>(K)</td><td><code>LazyColumn</code></td><td>Muestra la lista en pantalla</td><td><span class="tag v">View</span></td></tr>
+</table></div>
+
+<div class="caja ojo">
+  <strong class="titulo">Errores frecuentes (los que cometí y corregí)</strong>
+  <ul>
+    <li>Pensar que (A), (B) y (C) van al Repository “porque declaran variables”. Solo (B) es un dato que debe persistir.</li>
+    <li>Poner (I) en la View: <code>texto</code> es del ViewModel, y quien es dueño de un dato es quien lo modifica.</li>
+    <li>Poner (J) en el ViewModel: el <em>error</em> es del ViewModel, pero <em>mostrarlo</em> con <code>Text</code> y <code>Color.Red</code> es de la View.</li>
+  </ul>
+</div>
+
+<h3>La cadena completa de “Agregar”</h3>
+<ol>
+  <li><span class="tag v">View</span> el usuario aprieta <em>Agregar</em> → avisa al ViewModel.</li>
+  <li><span class="tag vm">ViewModel</span> aplica las reglas (E) y (F). Si pasan → le pide al Repository que agregue; limpia el campo (I).</li>
+  <li><span class="tag r">Repository</span> agrega la tarea (G) y la guarda en el archivo (H).</li>
+</ol>
+<p>Repository = <strong>dueño del dato</strong> · ViewModel = <strong>intermediario</strong> (lo pide y lo prepara) · View = <strong>solo lo muestra</strong>.
+La lista “verdadera” vive en un solo lugar: <strong>fuente de verdad única</strong>.</p>
+
+<div class="bloque"><h3>Desafío: las dos flechas (UDF – flujo unidireccional de datos)</h3>
+<pre>            EVENTO (sube)                      operación
+  View  ─────────────────────►  ViewModel  ──────────────►  Repository
+        "el usuario apretó                   "agregá esta
+         Agregar con 'Estudiar'"              tarea"
+
+            ESTADO (baja)
+  View  ◄─────────────────────  ViewModel
+        texto = "", error = null,
+        tareas = [..., "Estudiar"]</pre></div>
+
+<div class="caja clave">
+  <strong class="titulo">Evento vs. estado</strong>
+  <ul>
+    <li><strong>Evento</strong> = algo que <em>pasó</em> (un click, una tecla). Es puntual.</li>
+    <li><strong>Estado</strong> = cómo <em>está</em> la pantalla ahora. Se puede consultar en cualquier momento.</li>
+    <li><strong>UDF:</strong> los eventos suben y el estado baja. La View nunca modifica el estado por su cuenta: solo avisa y redibuja.</li>
+  </ul>
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué trabajo tendría que seguir funcionando aunque mañana cambiemos Compose por otra interfaz?</strong><br>
+Las <strong>reglas</strong> (E, F: no vacía, no repetida) y el <strong>manejo de datos</strong> (G, H: agregar y guardar).
+Es decir, todo lo que va en ViewModel y Repository.</p>
+<p><strong>2. ¿Qué datos existen sólo mientras se está escribiendo un formulario?</strong><br>
+<code>texto</code> (el borrador) y <code>error</code> (el mensaje actual). Son estado de pantalla y no se guardan en el archivo.</p>
+
+<div class="caja ojo">
+  <strong class="titulo">Señal de alarma: <code>Context</code> en un composable</strong>
+  <code>PantallaTareas</code> recibe un <code>Context</code> solo para poder escribir el archivo (H). La guía advierte
+  no aceptar soluciones que “llevan Context a todos los composables” o “abren archivos desde un botón”.
+  Es una pista de que el acceso a archivos está en el lugar equivocado: debería estar en el Repository.
+</div>
+
+<h3>Kotlin / Compose que apareció en el camino</h3>
+<table>
+  <tr><th style="width:32%">Elemento</th><th>Qué es</th></tr>
+  <tr><td><code>Unresolved reference: X</code></td><td>Kotlin no sabe qué es X: falta el <code>import</code>, está mal escrito o la función/clase no existe.</td></tr>
+  <tr><td><code>var x by remember { mutableStateOf(...) }</code></td><td>Estado observable que sobrevive a la recomposición. El <code>by</code> necesita los imports <code>getValue</code>/<code>setValue</code>.</td></tr>
+  <tr><td><code>LocalContext.current</code></td><td>Forma de obtener el <code>Context</code> de Android dentro de un composable.</td></tr>
+  <tr><td><code>modifier: Modifier = Modifier</code></td><td>Convención: permite que quien llama le pase padding, tamaño, etc. (por ejemplo el <code>innerPadding</code> del Scaffold).</td></tr>
+  <tr><td><code>@Preview</code> / <code>@Composable</code></td><td>Anotaciones: “etiquetas” que siempre se aplican a una función. Solas, sin función debajo, no compilan.</td></tr>
+</table>
+
+
+<h2 class="salto">Ejercicio 2 — Una pantalla no es su estado</h2>
+
+<p><strong>Consigna:</strong> pantalla de notas con título, contenido y botón Guardar. Definir una <code>data class</code> de estado
+de pantalla con el contenido actual, el error de validación y si hay una operación en curso. Simular el guardado.
+Identificar eventos separados para editar el título, editar el texto y pulsar Guardar. Todavía <strong>sin ViewModel</strong>.
+<br>Archivo: <code>Ej02PantallaNota.kt</code> · Rama: <code>ej02-estado-pantalla</code></p>
+
+<div class="caja clave">
+  <strong class="titulo">Estado de pantalla (UiState)</strong>
+  Una sola “foto” de todo lo que la pantalla necesita para dibujarse. En el Ej 1 había 3 variables sueltas;
+  ahora todo está junto en un objeto. <strong>Si sabés el estado, sabés exactamente qué se ve.</strong>
+</div>
+
+<div class="bloque">
+<h3>El estado</h3>
+<pre>data class Nota(val titulo: String, val contenido: String)   // una nota YA guardada
+
+data class NotaUiState(
+    val titulo: String = "",          // lo escrito en el campo título
+    val contenido: String = "",       // lo escrito en el campo contenido
+    val error: String? = null,        // error de validación (null = sin error)
+    val guardando: Boolean = false,   // operación en curso
+    val guardada: Nota? = null        // última nota guardada (null = ninguna)
+) {
+    val hayCambiosSinGuardar: Boolean get() = ...   // propiedad CALCULADA
+}</pre>
+</div>
+
+<table>
+  <tr><th style="width:30%">Elemento Kotlin</th><th>Por qué se usa</th></tr>
+  <tr><td><code>data class</code></td><td>Clase pensada para representar datos: genera <code>equals</code>, <code>toString</code> y <code>copy</code>.</td></tr>
+  <tr><td>Campos <code>val</code> + <code>copy(...)</code></td><td>El estado es inmutable: para cambiarlo se crea una copia nueva con los campos modificados. Cada cambio es un estado nuevo y Compose detecta que tiene que redibujar.</td></tr>
+  <tr><td><code>String?</code> / <code>Nota?</code></td><td>Tipo anulable: el error o la nota guardada pueden no existir (<code>null</code>).</td></tr>
+  <tr><td>Valores por defecto (<code>= ""</code>)</td><td><code>NotaUiState()</code> ya es el estado inicial: pantalla vacía.</td></tr>
+  <tr><td>Propiedad calculada (<code>get() = ...</code>)</td><td>Se deduce de otros campos en vez de guardarse: no hay información duplicada que pueda quedar desincronizada.</td></tr>
+</table>
+
+<div class="bloque">
+<h3>Desafío: tabla evento → cambio de estado (antes de codificar)</h3>
+<table>
+  <tr><th style="width:38%">Evento</th><th>Cambio de estado esperado</th></tr>
+  <tr><td>Edita el <strong>título</strong></td><td><code>titulo = nuevo</code>, <code>error = null</code> (el error deja de tener sentido al escribir)</td></tr>
+  <tr><td>Edita el <strong>contenido</strong></td><td><code>contenido = nuevo</code></td></tr>
+  <tr><td>Pulsa <strong>Guardar</strong> con título vacío</td><td><code>error = "El título no puede estar vacío"</code></td></tr>
+  <tr><td>Pulsa <strong>Guardar</strong> con título válido</td><td><code>guardando = true</code>, <code>error = null</code></td></tr>
+  <tr><td>Pulsa <strong>Guardar</strong> mientras ya guarda</td><td>Sin cambios: se ignora (y el botón está deshabilitado)</td></tr>
+  <tr><td><strong>Termina</strong> el guardado simulado</td><td><code>guardando = false</code>, <code>guardada = Nota(titulo, contenido)</code></td></tr>
+</table>
+</div>
+
+<div class="bloque">
+<h3>Cómo quedó organizado el código</h3>
+<table>
+  <tr><th style="width:38%">Pieza</th><th>Rol</th></tr>
+  <tr><td><code>Nota</code></td><td>Modelo: una nota ya guardada.</td></tr>
+  <tr><td><code>NotaUiState</code></td><td>Estado de pantalla: <strong>qué</strong> se ve.</td></tr>
+  <tr><td><code>alEditarTitulo</code>, <code>alEditarContenido</code>, <code>alPulsarGuardar</code>, <code>alTerminarGuardado</code></td><td>Funciones Kotlin <strong>puras</strong>: reciben el estado actual y devuelven el nuevo. No conocen Compose. En el Ej 3 se mudan al ViewModel casi sin cambios.</td></tr>
+  <tr><td><code>PantallaNotaConEstado</code></td><td>Dueño del estado (provisorio, hasta el Ej 3) y del guardado simulado con <code>delay</code>.</td></tr>
+  <tr><td><code>PantallaNota</code></td><td>View <strong>sin estado</strong>: dibuja el <code>NotaUiState</code> que recibe y avisa los eventos por callbacks.</td></tr>
+  <tr><td>4 <code>@Preview</code></td><td>Vacía · Error · Guardando · Guardada con cambios sin guardar.</td></tr>
+</table>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">State hoisting (elevar el estado)</strong>
+  <pre style="background:#fff">@Composable
+fun PantallaNota(
+    estado: NotaUiState,                  // el estado BAJA
+    onTituloChange: (String) -&gt; Unit,     // los eventos SUBEN
+    onContenidoChange: (String) -&gt; Unit,
+    onGuardar: () -&gt; Unit,
+    modifier: Modifier = Modifier
+)</pre>
+  La View no guarda ni decide nada: recibe un valor y funciones (callbacks) para avisar.
+  <strong>Ventaja concreta:</strong> como no tiene estado propio, se puede previsualizar en <em>cualquier</em> situación
+  pasándole un <code>NotaUiState</code> armado a mano. Es el mismo UDF del Ej 1, ahora en código.
+</div>
+
+<div class="caja clave">
+  <strong class="titulo">Lambdas y tipos función</strong>
+  <code>(String) -&gt; Unit</code> = “una función que recibe un String y no devuelve nada”. Se pasa como parámetro:
+  <code>onTituloChange = { estado = alEditarTitulo(estado, it) }</code>. Dentro de la lambda, <code>it</code> es el único parámetro (el texto nuevo).
+</div>
+
+<div class="caja ojo">
+  <strong class="titulo">Guardado simulado: corrutina</strong>
+  <code>rememberCoroutineScope()</code> + <code>scope.launch { delay(1500); ... }</code> espera 1,5 s <em>sin congelar la pantalla</em>.
+  Mientras tanto <code>guardando = true</code> → el botón muestra “Guardando...” y queda deshabilitado (<code>enabled = !estado.guardando</code>),
+  lo que evita la doble pulsación. En el Ej 3 esto pasa a <code>viewModelScope</code>.
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿El texto ingresado es lo mismo que la nota ya guardada?</strong><br>
+No. <code>titulo</code>/<code>contenido</code> son lo que el usuario <strong>está escribiendo</strong> (cambia en cada tecla); <code>guardada</code> es la
+<strong>última versión confirmada</strong>. Por eso son campos distintos, y comparar ambos es lo que permite mostrar “Hay cambios sin guardar”.</p>
+<p><strong>2. ¿Conviene mostrar el mensaje de error como parte del estado?</strong><br>
+Sí. Si el error está en el estado, la pantalla se reconstruye completa a partir de <code>NotaUiState</code> (UI = f(estado)): sobrevive a la
+recomposición, se puede previsualizar y, con ViewModel (Ej 3), también a la rotación. Un mensaje “suelto” disparado desde el botón (un Toast)
+no se puede consultar ni recuperar.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Criterio de finalización</strong>
+  ✅ Eventos reconocibles: <code>onTituloChange</code>, <code>onContenidoChange</code>, <code>onGuardar</code>.<br>
+  ✅ La pantalla se representa a partir de un único estado (<code>NotaUiState</code>): lo prueban las 4 previews, que dibujan cualquier situación sin ejecutar la app.
+</div>
+
+
+<h2 class="salto">Ejercicio 2 — Explicación paso a paso</h2>
+<p>Recorrido de <code>Ej02PantallaNota.kt</code> en el mismo orden en que está escrito el archivo.</p>
+
+<h3>Paso 0 · ¿Qué problema resuelve?</h3>
+<p>En el Ej 1 la pantalla tenía variables sueltas (<code>texto</code>, <code>tareas</code>, <code>error</code>): para saber qué se estaba viendo había que mirar
+tres cosas por separado, y cualquier parte del código podía cambiar cualquiera de ellas. La idea del Ej 2 es juntar todo en
+<strong>un solo objeto</strong>, el <em>estado de pantalla</em>. Si tenés ese objeto, sabés exactamente cómo se ve la pantalla: <strong>UI = f(estado)</strong>.</p>
+
+<div class="bloque">
+<h3>Paso 1 · <code>Nota</code>: el dato</h3>
+<pre>data class Nota(
+    val titulo: String,
+    val contenido: String
+)</pre>
+<p>Representa una <strong>nota ya guardada</strong>: el dato real, el que en ejercicios futuros va a ir al archivo.
+<code>data class</code> = clase cuyo propósito es guardar datos; Kotlin le genera <code>equals</code> (comparar), <code>toString</code> (imprimir) y
+<code>copy</code> (copiar cambiando algo). <code>val</code> = no se puede reasignar.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · <code>NotaUiState</code>: la “foto” de la pantalla</h3>
+<table>
+  <tr><th style="width:18%">Campo</th><th>Pregunta que responde</th><th style="width:36%">Qué dibuja</th></tr>
+  <tr><td><code>titulo</code></td><td>¿Qué hay escrito en el campo título?</td><td>El texto dentro del campo</td></tr>
+  <tr><td><code>contenido</code></td><td>¿Qué hay escrito en el campo contenido?</td><td>El texto dentro del campo</td></tr>
+  <tr><td><code>error</code></td><td>¿Hay un error de validación?</td><td>El mensaje rojo debajo del título</td></tr>
+  <tr><td><code>guardando</code></td><td>¿Se está guardando ahora?</td><td>Botón “Guardando...” y deshabilitado</td></tr>
+  <tr><td><code>guardada</code></td><td>¿Cuál es la última nota guardada?</td><td>La tarjeta de abajo</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong><code>String?</code> y <code>Nota?</code></strong>: el <code>?</code> significa que puede ser <code>null</code> (puede no haber error, o ninguna nota guardada todavía).</li>
+  <li><strong>Valores por defecto</strong> (<code>= ""</code>, <code>= null</code>, <code>= false</code>): por eso <code>NotaUiState()</code> sin parámetros es el estado inicial, la pantalla vacía.</li>
+  <li><strong>Todo es <code>val</code></strong>: el estado no se modifica, se <strong>reemplaza por uno nuevo</strong> con <code>copy</code>.</li>
+</ul>
+<pre>val antes = NotaUiState(titulo = "Hola")
+val despues = antes.copy(error = "algo")   // mismo título, pero con error
+// "antes" no cambió. "despues" es un objeto NUEVO.</pre>
+<p>¿Por qué así? Compose redibuja cuando el estado es <strong>reemplazado por otro distinto</strong>. Si se modificara un objeto por dentro, Compose podría no enterarse.</p>
+
+<div class="caja clave">
+  <strong class="titulo">La propiedad calculada <code>hayCambiosSinGuardar</code></strong>
+  No está entre los paréntesis: no se guarda, <strong>se calcula</strong> cada vez que alguien la lee, comparando <code>titulo</code>/<code>contenido</code> con <code>guardada</code>.
+  Si fuera un campo más habría que acordarse de actualizarlo cada vez que cambia el título, el contenido o la nota guardada; un olvido y la pantalla
+  muestra algo falso. Calculada, <strong>no puede quedar desincronizada nunca</strong>.
+</div>
+
+<h3>Paso 3 · Los eventos: “qué pasa cuando...”</h3>
+<p>Son el corazón del ejercicio. Todas tienen la misma forma: <strong>reciben el estado actual → devuelven el estado nuevo</strong>.</p>
+<table>
+  <tr><th style="width:44%">Función</th><th>Qué hace</th></tr>
+  <tr><td><code>alEditarTitulo(estado, nuevo)</code><br><code>= estado.copy(titulo = nuevo, error = null)</code></td><td>Actualiza el título y <strong>borra el error</strong>: si decía “El título no puede estar vacío” y el usuario empieza a escribir, ese mensaje ya no tiene sentido.</td></tr>
+  <tr><td><code>alEditarContenido(estado, nuevo)</code><br><code>= estado.copy(contenido = nuevo)</code></td><td>Solo cambia el contenido.</td></tr>
+  <tr><td><code>alPulsarGuardar(estado)</code></td><td><code>when</code> evalúa en orden y usa la primera condición que se cumpla:
+    1) ¿ya se está guardando? → no hace nada; 2) ¿título vacío o solo espacios? → pone el error; 3) si no → <code>guardando = true</code>.</td></tr>
+  <tr><td><code>alTerminarGuardado(estado)</code></td><td>Deja de estar “guardando” y lo escrito pasa a ser la <code>guardada</code>.</td></tr>
+</table>
+<div class="caja regla">
+  <strong class="titulo">Lo clave</strong>
+  Ninguna tiene <code>@Composable</code>, ni <code>Text</code>, ni nada de pantalla: <strong>son Kotlin puro</strong>. Son las reglas que en el Ej 1 dijimos que van al
+  <strong>ViewModel</strong>. En el Ej 3 se mudan ahí casi sin cambios.
+</div>
+
+<div class="bloque">
+<h3>Paso 4 · <code>PantallaNota</code>: la View</h3>
+<pre>@Composable
+fun PantallaNota(
+    estado: NotaUiState,                  // lo que tiene que dibujar  → el estado BAJA
+    onTituloChange: (String) -&gt; Unit,     // funciones para AVISAR     → los eventos SUBEN
+    onContenidoChange: (String) -&gt; Unit,
+    onGuardar: () -&gt; Unit,
+    modifier: Modifier = Modifier
+)</pre>
+</div>
+<div class="caja clave">
+  <strong class="titulo">¿Qué es <code>(String) -&gt; Unit</code>?</strong>
+  El <strong>tipo</strong> de una función: “recibe un String y no devuelve nada” (<code>Unit</code> ≈ <code>void</code> de Java). <code>() -&gt; Unit</code> no recibe nada
+  y no devuelve nada. A <code>PantallaNota</code> se le pasan <strong>funciones como parámetros</strong>, y ella las llama cuando el usuario hace algo.
+</div>
+<p>Adentro, cada pieza lee del estado:</p>
+<pre>OutlinedTextField(
+    value = estado.titulo,                               // muestra lo que dice el estado
+    onValueChange = onTituloChange,                      // cuando el usuario escribe, AVISA
+    isError = estado.error != null,                      // si hay error, borde rojo
+    supportingText = { estado.error?.let { Text(it) } }  // y el mensaje
+)
+Button(
+    onClick = onGuardar,                                 // cuando aprieta, AVISA
+    enabled = !estado.guardando                          // deshabilitado mientras guarda
+) { Text(if (estado.guardando) "Guardando..." else "Guardar") }</pre>
+<p><strong>Lo que NO hace:</strong> no valida, no guarda, no decide nada. Si el usuario escribe, no cambia el título: solo avisa “escribieron esto”.
+Esto se llama <strong>state hoisting</strong> (elevar el estado): la pantalla no es dueña de su estado, lo recibe desde arriba.</p>
+
+<div class="bloque">
+<h3>Paso 5 · <code>PantallaNotaConEstado</code>: el dueño (provisorio)</h3>
+<pre>@Composable
+fun PantallaNotaConEstado(modifier: Modifier = Modifier) {
+    var estado by remember { mutableStateOf(NotaUiState()) }
+    val scope = rememberCoroutineScope()
+
+    PantallaNota(
+        estado = estado,
+        onTituloChange = { estado = alEditarTitulo(estado, it) },
+        onContenidoChange = { estado = alEditarContenido(estado, it) },
+        onGuardar = { ... },
+    )
+}</pre>
+</div>
+<ul>
+  <li><code>mutableStateOf</code>: Compose <strong>observa</strong> esta variable; cuando cambia, redibuja.</li>
+  <li><code>remember</code>: hace que el valor <strong>no se pierda</strong> cuando Compose redibuja.</li>
+  <li><code>{ estado = alEditarTitulo(estado, it) }</code> es una <strong>lambda</strong> (función sin nombre); <code>it</code> es el parámetro que recibe (el texto nuevo).
+  Se lee: “cuando cambie el título, reemplazá el estado por el resultado de <code>alEditarTitulo</code>”.</li>
+  <li>En el Ej 3 este rol (dueño del estado) lo toma el <strong>ViewModel</strong>.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 6 · El guardado simulado</h3>
+<pre>onGuardar = {
+    estado = alPulsarGuardar(estado)            // 1. aplicar la regla
+    if (estado.guardando) {                     // 2. ¿pasó la validación?
+        scope.launch {                          // 3. arrancar tarea en segundo plano
+            delay(1500)                         // 4. esperar 1,5 s (simula el disco)
+            estado = alTerminarGuardado(estado) // 5. listo
+        }
+    }
+}</pre>
+<p>¿Por qué <code>scope.launch</code>? Si se esperara 1,5 s “normalmente”, <strong>la pantalla se congelaría</strong>. <code>launch</code> arranca una
+<strong>corrutina</strong>: una tarea que espera sin bloquear la pantalla. Por ahora alcanza con: <em>“launch + delay = esperar sin congelar la app”</em> (se profundiza en el Ej 9).</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 7 · Recorrido completo de un click</h3>
+<p>Título “Parcial” escrito, el usuario aprieta <strong>Guardar</strong>:</p>
+<pre>1. VIEW      Button → llama onGuardar()                              (EVENTO sube)
+2. DUEÑO     estado = alPulsarGuardar(estado)
+3. REGLA     título "Parcial" no está vacío → copy(guardando = true)
+4. COMPOSE   detecta estado nuevo → redibuja PantallaNota
+5. VIEW      lee estado.guardando = true → botón "Guardando..." deshabilitado
+                                                                     (ESTADO baja)
+   ... 1,5 segundos ...
+6. DUEÑO     estado = alTerminarGuardado(estado)
+7. REGLA     copy(guardando = false, guardada = Nota("Parcial", ""))
+8. COMPOSE   redibuja
+9. VIEW      botón vuelve a "Guardar" + aparece la tarjeta "Última nota guardada"</pre>
+<p><strong>Nadie toca la pantalla directamente.</strong> Solo se cambia el estado, y la pantalla se redibuja sola a partir de él.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 8 · Los Previews</h3>
+<pre>@Preview(name = "2. Error de validación")
+@Composable
+fun PantallaNotaErrorPreview() {
+    MvvmLabTheme {
+        PantallaNota(
+            NotaUiState(
+                contenido = "Texto sin título",
+                error = "El título no puede estar vacío"
+            ),
+            {}, {}, {}
+        )
+    }
+}</pre>
+<p>Como <code>PantallaNota</code> solo dibuja lo que le pasan, se puede armar un estado a mano con cualquier situación y <strong>verla sin correr la app</strong>.
+Los <code>{}</code> son lambdas vacías: en el preview los botones no necesitan hacer nada. Es la <strong>prueba del criterio de finalización</strong>:
+si cualquier situación se dibuja pasando solo un <code>NotaUiState</code>, la pantalla se representa a partir de un único estado.</p>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><strong><code>NotaUiState</code></strong> = todo lo que la pantalla necesita, en un objeto. Inmutable: se cambia con <code>copy</code>.</li>
+    <li><strong>Funciones de evento</strong> = reglas puras <em>estado → estado nuevo</em>. Sin Compose. En el Ej 3 van al ViewModel.</li>
+    <li><strong><code>PantallaNota</code></strong> = View sin estado. Recibe <code>estado</code> (baja) y callbacks (suben). No decide nada.</li>
+    <li><strong><code>PantallaNotaConEstado</code></strong> = dueño provisorio del estado. Conecta eventos con reglas.</li>
+    <li><strong>Nunca se toca la pantalla</strong>: se cambia el estado y Compose redibuja.</li>
+  </ol>
+</div>
+
+<div class="caja ojo">
+  <strong class="titulo">Para comprobar que se entendió</strong>
+  Si en <code>alEditarTitulo</code> se sacara el <code>error = null</code> y quedara solo <code>estado.copy(titulo = nuevo)</code>, ¿qué pasaría en la pantalla
+  al apretar Guardar con el título vacío y después empezar a escribir?
+</div>
+
+
+<h2 class="salto">Ejercicio 3 — Primer ViewModel, sin magia</h2>
+
+<p><strong>Consigna:</strong> mover la lógica del ejercicio anterior a una clase que extienda <code>ViewModel</code>. La pantalla recibe estado y
+funciones de evento, sin decidir cómo se guarda una nota. Obtener el ViewModel con el mecanismo apropiado del proyecto y comprobar qué sucede al
+rotar el emulador. <strong>Desafío:</strong> contador de intentos de guardado para observar la vida del ViewModel.
+<br>Rama: <code>ej03-viewmodel</code> · Archivos: <code>NotaViewModel.kt</code> (ViewModel), <code>NotaUiState.kt</code> (modelo y estado), <code>PantallaNota.kt</code> (View)</p>
+
+<h3>Paso 0 · ¿Qué problema resuelve?</h3>
+<p>En el Ej 2 el dueño del estado era un composable con <code>remember</code>. <code>remember</code> vive mientras vive <strong>la pantalla</strong>.
+Pero cuando el teléfono <strong>rota</strong>, Android <strong>destruye y vuelve a crear la Activity</strong> (es un <em>cambio de configuración</em>; también pasa
+al cambiar idioma, modo oscuro o tamaño de ventana). Con la Activity se va todo lo que estaba en <code>remember</code>: <strong>se borra lo escrito</strong>.</p>
+
+<div class="figs">
+  <figure><img src="img/ej03_remember_antes.png" style="height:190px"><br>Ej 2 (remember)<br>antes de rotar</figure>
+  <figure><img src="img/ej03_remember_despues.png" style="width:255px"><br>Ej 2 (remember) después de rotar:<br><strong>se perdió todo</strong></figure>
+  <figure><img src="img/ej03_viewmodel_rotado.png" style="width:255px"><br>Ej 3 (ViewModel) después de rotar:<br><strong>se conserva todo</strong> (intentos: 2)</figure>
+</div>
+<p style="text-align:center;font-size:9pt;color:var(--gris)">Capturas reales del emulador (Pixel 8).</p>
+
+<div class="caja clave">
+  <strong class="titulo">ViewModel</strong>
+  Clase que guarda el <strong>estado de pantalla</strong> y la <strong>lógica</strong> de una pantalla, y que <strong>sobrevive a los cambios de configuración</strong>.
+  Android la mantiene viva mientras la pantalla “exista para el usuario”, aunque la Activity se destruya y recree por dentro.
+  No dibuja nada y no conoce la Activity.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · La clase <code>NotaViewModel</code></h3>
+<pre>class NotaViewModel : ViewModel() {          // ": ViewModel()" = hereda de ViewModel
+
+    var estado by mutableStateOf(NotaUiState())
+        private set                           // afuera se LEE, solo el VM lo CAMBIA
+
+    var intentosGuardado by mutableStateOf(0) // desafío
+        private set
+
+    init { Log.d(TAG, "ViewModel CREADO") }   // se ejecuta UNA vez al crearse
+    ...
+}</pre>
+</div>
+<ul>
+  <li><strong><code>: ViewModel()</code></strong>: <code>NotaViewModel</code> <em>hereda</em> de la clase <code>ViewModel</code> de Android; eso es lo que le da la capacidad de sobrevivir a la rotación.</li>
+  <li><strong>Mismo <code>NotaUiState</code> del Ej 2</strong>: el estado no cambió, cambió <em>quién es su dueño</em>.</li>
+  <li><strong><code>private set</code></strong>: la pantalla puede leer <code>viewModel.estado</code> pero <strong>no</strong> puede hacer <code>viewModel.estado = ...</code>.
+  Solo el ViewModel modifica su estado → UDF garantizado por el compilador. (En el Ej 4 esto se hace con <code>StateFlow</code>.)</li>
+  <li><strong><code>init { }</code></strong>: bloque que corre al construir el objeto. El <code>Log.d</code> permite ver en <strong>Logcat</strong> (filtro <code>NotaViewModel</code>) cuántas veces se crea.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · Los eventos ahora son métodos del ViewModel</h3>
+<pre>fun onTituloChange(nuevo: String) {
+    estado = estado.copy(titulo = nuevo, error = null)
+}
+
+fun onContenidoChange(nuevo: String) {
+    estado = estado.copy(contenido = nuevo)
+}
+
+fun onGuardar() {
+    if (estado.guardando) return                    // ya guardando: ignorar
+    intentosGuardado++                              // desafío: cuenta TODOS los intentos
+    if (estado.titulo.isBlank()) {
+        estado = estado.copy(error = "El título no puede estar vacío")
+        return
+    }
+    estado = estado.copy(guardando = true, error = null)
+    viewModelScope.launch {
+        delay(1500)                                 // guardado SIMULADO
+        estado = estado.copy(guardando = false,
+                             guardada = Nota(estado.titulo, estado.contenido))
+    }
+}</pre>
+</div>
+<p>Son <strong>las mismas reglas</strong> que en el Ej 2 eran funciones sueltas (<code>alEditarTitulo</code>, <code>alPulsarGuardar</code>...). Se “mudaron” al ViewModel casi sin cambios.
+Por eso valió la pena separarlas en el Ej 2.</p>
+<div class="caja ojo">
+  <strong class="titulo"><code>viewModelScope</code> en vez de <code>rememberCoroutineScope</code></strong>
+  Las corrutinas lanzadas en <code>viewModelScope</code> viven lo que vive el ViewModel: si se rota <em>a mitad del guardado</em>, el guardado sigue y termina bien.
+  Con <code>rememberCoroutineScope</code> (Ej 2) se cancelaba junto con la pantalla. Si el ViewModel se destruye de verdad, sus corrutinas se cancelan solas.
+</div>
+
+<div class="bloque">
+<h3>Paso 3 · <code>onCleared()</code>: el final de la vida</h3>
+<pre>override fun onCleared() {
+    Log.d(TAG, "ViewModel DESTRUIDO")
+}</pre>
+<p>Android lo llama cuando el ViewModel se destruye <strong>definitivamente</strong> (por ejemplo, salir de la pantalla con “atrás”). <strong>No</strong> se llama al rotar.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 4 · Obtener el ViewModel: <code>by viewModels()</code></h3>
+<pre>class MainActivity : ComponentActivity() {
+    private val notaViewModel: NotaViewModel by viewModels()
+    ...
+        PantallaNotaConViewModel(viewModel = notaViewModel, ...)
+}</pre>
+</div>
+<ul>
+  <li><code>by viewModels()</code> <strong>no crea uno nuevo cada vez</strong>: le pide a Android “el ViewModel de esta pantalla”. La primera vez lo crea; si la Activity
+  se recrea (rotación), devuelve <strong>el mismo</strong>.</li>
+  <li>Es el “mecanismo apropiado del proyecto”: viene en <code>activity-ktx</code>, que ya estaba como dependencia de <code>activity-compose</code>. <strong>No hubo que agregar bibliotecas.</strong></li>
+</ul>
+<div class="caja ojo">
+  <strong class="titulo">Error típico: <code>val vm = NotaViewModel()</code></strong>
+  Crearlo “a mano” lo convierte en un objeto común: se crea uno nuevo en cada recreación (o peor, en cada recomposición si se hace dentro de un composable)
+  y el estado se pierde igual que con <code>remember</code>. La guía lo marca como propuesta a rechazar.
+</div>
+
+<div class="bloque">
+<h3>Paso 5 · La pantalla: <code>PantallaNota</code> se reutiliza SIN CAMBIOS</h3>
+<pre>@Composable
+fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        PantallaNota(
+            estado = viewModel.estado,                    // el estado BAJA
+            onTituloChange = viewModel::onTituloChange,   // los eventos SUBEN
+            onContenidoChange = viewModel::onContenidoChange,
+            onGuardar = viewModel::onGuardar
+        )
+        Text("Intentos de guardado: ${viewModel.intentosGuardado}")
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>PantallaNota</code> es exactamente la del Ej 2.</strong> Como era una View sin estado, no le importa quién es el dueño (antes un composable, ahora un ViewModel).
+  Este es el beneficio concreto del <em>state hoisting</em>.</li>
+  <li><strong><code>viewModel::onGuardar</code></strong> es una <em>referencia a función</em>: “pasá el método <code>onGuardar</code> de este objeto”.
+  Equivale a la lambda <code>{ viewModel.onGuardar() }</code>, pero más corta.</li>
+  <li><strong><code>verticalScroll</code></strong>: al rotar, en horizontal la pantalla no entra entera; sin scroll, la tarjeta y el contador quedaban fuera de vista.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 6 · Quién hace qué (criterio de finalización)</h3>
+<table>
+  <tr><th style="width:22%">Pieza</th><th>Hace</th><th style="width:34%">NO hace</th></tr>
+  <tr><td><span class="tag v">MainActivity</span></td><td>Obtiene el ViewModel y lo conecta con la pantalla.</td><td>✅ No valida notas.</td></tr>
+  <tr><td><span class="tag v">PantallaNota</span></td><td>Dibuja <code>estado</code>, avisa eventos.</td><td>No decide, no guarda.</td></tr>
+  <tr><td><span class="tag vm">NotaViewModel</span></td><td>Es dueño del estado, aplica reglas, coordina el guardado.</td><td>✅ No llama composables; no conoce la Activity.</td></tr>
+</table>
+</div>
+
+<h3>Experimentos realizados</h3>
+<table>
+  <tr><th style="width:34%">Prueba</th><th>Resultado observado</th></tr>
+  <tr><td>Rotar con <strong>Ej 2</strong> (<code>remember</code>)</td><td>Título y contenido <strong>se borran</strong>.</td></tr>
+  <tr><td>Rotar con <strong>Ej 3</strong> (ViewModel)</td><td>Se conservan título, contenido, nota guardada e <strong>intentos: 2</strong>. Logcat: <code>ViewModel CREADO</code> aparece <strong>una sola vez</strong> (rotando ida y vuelta).</td></tr>
+  <tr><td>App a segundo plano + <code>adb shell am kill</code> (Android mata el proceso) y volver</td><td>Pantalla <strong>vacía</strong>, intentos: 0. Logcat: un segundo <code>ViewModel CREADO</code> con <strong>otro</strong> identificador.</td></tr>
+</table>
+
+<div class="figs">
+  <figure><img src="img/ej03_proceso_muerto.png" style="height:230px"><br>Después de matar el proceso:<br>ViewModel nuevo, estado perdido</figure>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">¿Qué sobrevive a qué? (pregunta transversal de la guía)</strong>
+  <table style="margin:6px 0 0;background:#fff">
+    <tr><th></th><th>Recomposición</th><th>Rotación</th><th>Muerte del proceso</th></tr>
+    <tr><td><code>remember</code></td><td>✅</td><td>❌</td><td>❌</td></tr>
+    <tr><td><code>rememberSaveable</code></td><td>✅</td><td>✅</td><td>✅* (datos chicos)</td></tr>
+    <tr><td>ViewModel</td><td>✅</td><td>✅</td><td>❌</td></tr>
+    <tr><td>Repository + archivo / Room</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  </table>
+  <p style="font-size:9pt;margin:4px 0 0">* Solo si el proceso lo mató <em>Android</em> (falta de memoria); si el usuario cierra la app a propósito, también se pierde.</p>
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué problema resuelve el ViewModel?</strong><br>
+Dos cosas: (a) <strong>sobrevive a los cambios de configuración</strong> (rotación, idioma, modo oscuro): el estado de pantalla y las operaciones en curso no se pierden
+cuando Android recrea la Activity; (b) <strong>saca la lógica de la UI</strong>: las reglas quedan en una clase Kotlin que no dibuja ni conoce la Activity,
+y la pantalla solo muestra estado y avisa eventos.</p>
+<p><strong>2. ¿Qué sucederá si el proceso se elimina completamente?</strong><br>
+El ViewModel vive <strong>en memoria</strong>, dentro del proceso: si Android lo mata (por falta de memoria con la app en segundo plano) o el usuario
+la cierra, el ViewModel <strong>muere con él</strong> y al volver se crea uno nuevo, vacío. Se pierde todo (lo comprobamos). <strong>Un ViewModel no es persistencia.</strong>
+Para sobrevivir a eso: lo escrito a medias, con <code>SavedStateHandle</code>/<code>rememberSaveable</code>; los datos reales, con un Repository que guarde en
+archivo o Room (Ej 6 en adelante).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>El estado y las reglas se mudan del composable al <strong>ViewModel</strong>; <code>NotaUiState</code> y <code>PantallaNota</code> no cambian.</li>
+    <li>El ViewModel <strong>sobrevive a la rotación</strong> pero <strong>no a la muerte del proceso</strong>.</li>
+    <li>Se obtiene con <code>by viewModels()</code>, nunca con <code>NotaViewModel()</code> a mano.</li>
+    <li><code>private set</code>: la pantalla lee el estado pero no puede cambiarlo.</li>
+    <li><code>viewModelScope</code>: corrutinas que viven lo que vive el ViewModel.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 4 — StateFlow: la pantalla observa</h2>
+<p><strong>Consigna:</strong> exponer desde el ViewModel un <code>StateFlow</code> de sólo lectura y mantener mutable su implementación. En Compose
+recolectarlo con la API consciente del ciclo de vida (<code>collectAsStateWithLifecycle</code>). Hacer que editar un campo cambie el estado visible.
+<strong>Desafío:</strong> registrar cambios puntuales y comprobar que editar un campo no borra el otro.
+<br>Rama: <code>ej04-stateflow</code> · Archivo principal: <code>NotaViewModel.kt</code></p>
+
+<h3>Paso 0 · ¿Qué cambia respecto del Ej 3?</h3>
+<p>En el Ej 3 el estado era un <code>mutableStateOf</code> (una API <strong>de Compose</strong>) dentro del ViewModel. Funciona, pero ata el ViewModel a Compose.
+<code>StateFlow</code> es una API <strong>de Kotlin (corrutinas)</strong>: el ViewModel queda independiente de la interfaz, y es lo que usan Room, los
+Repository y casi toda la documentación oficial.</p>
+
+<div class="caja clave">
+  <strong class="titulo">StateFlow</strong>
+  Un “contenedor observable” que <strong>siempre tiene un valor actual</strong> (<code>.value</code>) y <strong>avisa a quien lo observe</strong> cada vez que cambia.
+  Es el patrón <em>Observer</em> de la teoría: el ViewModel produce, la pantalla se suscribe y reacciona. <code>MutableStateFlow</code> se puede escribir;
+  <code>StateFlow</code> solo se puede leer.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · Backing property: mutable adentro, solo lectura afuera</h3>
+<pre>class NotaViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(NotaUiState())     // PRIVADO: solo el VM escribe
+    val uiState: StateFlow&lt;NotaUiState&gt; = _uiState.asStateFlow() // PÚBLICO: solo lectura
+}</pre>
+</div>
+<ul>
+  <li>Por convención, el guion bajo (<code>_uiState</code>) marca la versión privada y mutable.</li>
+  <li><code>asStateFlow()</code> devuelve una vista de <strong>solo lectura</strong> del mismo flujo: aunque alguien intente castearla, no puede escribir.</li>
+  <li>Es la versión “flujo” del <code>private set</code> del Ej 3.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · Los eventos usan <code>update { }</code></h3>
+<pre>fun onTituloChange(nuevo: String) {
+    _uiState.update { it.copy(titulo = nuevo, error = null) }
+}
+fun onContenidoChange(nuevo: String) {
+    _uiState.update { it.copy(contenido = nuevo) }
+}</pre>
+<p><code>update { actual -&gt; nuevo }</code> toma el valor <strong>actual</strong> y lo reemplaza por el que devuelve la lambda (<code>it</code> = estado actual).
+Cada evento hace <code>copy</code> <strong>solo del campo que le corresponde</strong> → editar el título nunca borra el contenido (desafío).
+Además <code>update</code> es <strong>atómico</strong>: si dos cambios llegan casi juntos, ninguno pisa al otro.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 3 · La pantalla observa con <code>collectAsStateWithLifecycle</code></h3>
+<pre>@Composable
+fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
+    val estado by viewModel.uiState.collectAsStateWithLifecycle()
+    PantallaNota(
+        estado = estado,
+        onTituloChange = viewModel::onTituloChange,
+        onContenidoChange = viewModel::onContenidoChange,
+        onGuardar = viewModel::onGuardar
+    )
+}</pre>
+</div>
+<ul>
+  <li><strong>collect</strong> = suscribirse al flujo; <strong>AsState</strong> = convertir cada valor en un <code>State</code> de Compose → cuando llega uno nuevo, se recompone.</li>
+  <li><strong>WithLifecycle</strong> = deja de recolectar cuando la app pasa a segundo plano (no gasta trabajo en una pantalla que nadie ve) y retoma al volver.
+  La versión sin ciclo de vida, <code>collectAsState()</code>, seguiría recolectando en segundo plano.</li>
+  <li>Compose <strong>no guarda una segunda copia</strong> de la nota (ningún <code>remember</code> con el título): lee siempre la del ViewModel (criterio de finalización).</li>
+  <li><code>PantallaNota</code> y <code>NotaUiState</code> <strong>no cambiaron</strong>.</li>
+</ul>
+
+<div class="caja ojo">
+  <strong class="titulo">Dependencia agregada (justificada)</strong>
+  <code>collectAsStateWithLifecycle</code> vive en <code>androidx.lifecycle:lifecycle-runtime-compose</code>, que el proyecto no tenía. Se agregó en
+  <code>libs.versions.toml</code> con versión <code>2.10.0</code>, la <strong>misma</strong> de lifecycle que ya usaba el proyecto (no se actualizó nada más).
+  La guía la nombra explícitamente como la API esperada.
+</div>
+
+<h3>Experimento: registrar cambios puntuales (Logcat, filtro <code>NotaViewModel</code>)</h3>
+<pre>titulo -&gt; titulo='Parcial D'   contenido='Repasar StateFlow' error=null guardando=false
+titulo -&gt; titulo='Parcial DA'  contenido='Repasar StateFlow' error=null guardando=false
+titulo -&gt; titulo='Parcial DA1' contenido='Repasar StateFlow' error=null guardando=false</pre>
+<p>Se escribió el contenido y <em>después</em> se siguió editando el título: el contenido se mantiene en cada cambio. ✅</p>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Por qué la pantalla no debería poder modificar directamente <code>_uiState</code>?</strong><br>
+Porque rompería el flujo unidireccional: el ViewModel dejaría de ser el único dueño del estado y cualquier pantalla podría saltearse las reglas
+(por ejemplo, poner <code>guardando = false</code> a mano o guardar un título vacío). Si solo el ViewModel escribe, cada cambio pasa por un evento
+con nombre (<code>onGuardar</code>...) y es fácil saber <em>quién</em> cambió <em>qué</em>. El compilador lo garantiza: <code>_uiState</code> es privado.</p>
+<p><strong>2. ¿Qué parte se recompone?</strong><br>
+Cuando llega un estado nuevo se vuelve a ejecutar <code>PantallaNotaConViewModel</code> (es quien lee <code>estado</code>) y, dentro de <code>PantallaNota</code>,
+Compose redibuja solo lo que depende de valores que cambiaron: al escribir en el título se actualiza ese <code>OutlinedTextField</code> y el aviso de
+“cambios sin guardar”; partes cuyos parámetros no cambiaron (el texto fijo “Nueva nota”, la tarjeta de la nota guardada) se <em>saltean</em>.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>_uiState: MutableStateFlow</code> privado + <code>uiState: StateFlow</code> público de solo lectura.</li>
+    <li>Eventos con <code>_uiState.update { it.copy(...) }</code>: atómico y sin pisar otros campos.</li>
+    <li>La pantalla recolecta con <code>collectAsStateWithLifecycle()</code> y no guarda copias propias.</li>
+    <li>StateFlow es Kotlin, no Compose: el ViewModel no depende de la UI.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 5 — Validar sin esconder la regla en un botón</h2>
+<p><strong>Consigna:</strong> agregar reglas: título no vacío, contenido de al menos diez caracteres y prohibición de guardar dos veces mientras se
+procesa una solicitud. Ubicar las reglas fuera de la vista. Mostrar errores cerca de los campos, sin diálogos para cada tecla.
+<strong>Desafío:</strong> probar espacios en blanco, una nota válida y dos pulsaciones seguidas.
+<br>Rama: <code>ej05-validacion</code> · Archivos nuevos: <code>ValidadorNota.kt</code>, <code>ValidadorNotaTest.kt</code></p>
+
+<h3>Paso 0 · El problema: la regla “escondida” en el botón</h3>
+<p>Si la validación se escribe dentro del <code>onClick</code> del botón (como en la pantalla del Ej 1), la regla queda mezclada con la interfaz:
+no se puede probar sin abrir la pantalla, no se puede reutilizar y, si mañana se guarda desde otro lugar (otro botón, un atajo), hay que copiarla.
+La regla es <strong>del negocio</strong>, no del botón.</p>
+
+<div class="bloque">
+<h3>Paso 1 · <code>ValidadorNota</code>: las reglas en Kotlin puro</h3>
+<pre>data class ErroresNota(val titulo: String? = null, val contenido: String? = null) {
+    val hayErrores: Boolean get() = titulo != null || contenido != null
+}
+
+object ValidadorNota {
+    const val MIN_CARACTERES_CONTENIDO = 10
+
+    fun validar(titulo: String, contenido: String): ErroresNota = ErroresNota(
+        titulo = if (titulo.isBlank()) "El título no puede estar vacío" else null,
+        contenido = if (contenido.trim().length &lt; MIN_CARACTERES_CONTENIDO)
+            "El contenido debe tener al menos $MIN_CARACTERES_CONTENIDO caracteres" else null
+    )
+}</pre>
+</div>
+<ul>
+  <li><strong><code>object</code></strong>: un <em>singleton</em>, una clase con una única instancia. Sirve para funciones sin estado: se llama directo, <code>ValidadorNota.validar(...)</code>.</li>
+  <li><strong><code>isBlank()</code></strong> vs <code>isEmpty()</code>: <code>"   ".isEmpty()</code> es <code>false</code>, pero <code>"   ".isBlank()</code> es <code>true</code>. Con <code>isBlank</code> un título de solo espacios es inválido.</li>
+  <li><strong><code>trim()</code></strong> saca los espacios de los extremos antes de contar: <code>"   corto   "</code> tiene 11 caracteres pero solo 5 reales.</li>
+  <li><strong><code>ErroresNota</code></strong> tiene un error <em>por campo</em>: así cada mensaje se puede mostrar al lado de su campo.</li>
+  <li><strong><code>const val</code></strong>: constante conocida en compilación; el número 10 está en un solo lugar.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · El ViewModel aplica las reglas; el botón solo avisa</h3>
+<pre>fun onGuardar() {
+    val actual = _uiState.value
+    if (actual.guardando) return                                  // regla 3: no guardar dos veces
+
+    val errores = ValidadorNota.validar(actual.titulo, actual.contenido) // reglas 1 y 2
+    if (errores.hayErrores) {
+        _uiState.update { it.copy(errorTitulo = errores.titulo, errorContenido = errores.contenido) }
+        return
+    }
+    _uiState.update { it.copy(guardando = true) }
+    viewModelScope.launch { delay(1500); _uiState.update { it.copy(guardando = false, guardada = ...) } }
+}</pre>
+</div>
+<div class="caja clave">
+  <strong class="titulo">Regla 3: dos capas de protección</strong>
+  <code>enabled = !estado.guardando</code> en el botón es la ayuda <strong>visual</strong> (el usuario ve que no puede tocar). <code>if (actual.guardando) return</code>
+  en el ViewModel es la <strong>regla</strong>: aunque llegaran dos clics antes de que el botón se deshabilite, el segundo se ignora. La regla no puede
+  depender de que la vista se dibuje a tiempo.
+</div>
+
+<h3>Paso 3 · Estado: un error por campo</h3>
+<p><code>NotaUiState</code> reemplaza <code>error</code> por <code>errorTitulo</code> y <code>errorContenido</code>. La vista solo decide <em>cómo</em> mostrarlos:</p>
+<pre>OutlinedTextField(
+    value = estado.contenido, onValueChange = onContenidoChange,
+    isError = estado.errorContenido != null,                     // borde rojo
+    supportingText = { estado.errorContenido?.let { Text(it) } } // mensaje debajo del campo
+)</pre>
+
+<div class="figs"><figure><img src="img/ej05_errores.png" style="height:260px"><br>Título con solo espacios y contenido “corto”:<br>cada error debajo de su campo</figure></div>
+
+<h3>Paso 4 · ¿Cuándo se limpia un error?</h3>
+<pre>fun onTituloChange(nuevo: String) {
+    _uiState.update { it.copy(titulo = nuevo, errorTitulo = null) }   // solo el error del título
+}</pre>
+<p>Cuando el usuario <strong>edita ese campo</strong>: indica que lo está corrigiendo y no lo molesta en cada tecla. Se limpia <strong>solo el error del
+campo editado</strong>; el del otro campo sigue visible hasta que lo corrija. La validación completa se vuelve a hacer al pulsar Guardar.</p>
+
+<h3>Paso 5 · Tests del validador (desafío)</h3>
+<p><code>app/src/test/.../ValidadorNotaTest.kt</code> — tests JUnit que corren en la computadora, <strong>sin emulador</strong> (click derecho → Run):</p>
+<table>
+  <tr><th>Test</th><th>Comprueba</th><th>Resultado</th></tr>
+  <tr><td><code>tituloSoloEspacios_esInvalido</code></td><td><code>"     "</code> no es un título válido</td><td>✅</td></tr>
+  <tr><td><code>contenidoConEspaciosAlrededor_noCuentaLosEspacios</code></td><td><code>"   corto   "</code> no alcanza los 10</td><td>✅</td></tr>
+  <tr><td><code>contenidoDeExactamente10Caracteres_esValido</code></td><td>Borde: 10 caracteres es válido</td><td>✅</td></tr>
+  <tr><td><code>notaValida_noTieneErrores</code></td><td>Una nota correcta pasa</td><td>✅</td></tr>
+  <tr><td><code>ambosCamposMal_informaAmbosErrores</code></td><td>Se informan los dos errores juntos</td><td>✅</td></tr>
+</table>
+<p><strong>Dos pulsaciones seguidas</strong> (en el emulador, dos toques casi simultáneos): Logcat muestra un único <code>guardando '...'</code> → se guardó una sola vez. ✅</p>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Cuál es una regla de negocio y cuál es una decisión visual?</strong><br>
+<em>Regla de negocio</em>: “el contenido debe tener al menos 10 caracteres”, “no se guarda dos veces a la vez” — valen igual en Android, web o una API.
+<em>Decisión visual</em>: mostrar el error en rojo debajo del campo, deshabilitar el botón, el texto “Guardando...”. Si cambio la interfaz, las
+decisiones visuales cambian; las reglas no.</p>
+<p><strong>2. ¿En qué momento conviene limpiar un mensaje de error?</strong><br>
+Cuando el usuario modifica el campo que lo causó (y solo ese error). Limpiarlo antes (o validar en cada tecla mostrando errores desde la primera letra)
+molesta; no limpiarlo nunca deja un mensaje desactualizado mientras el usuario ya lo está corrigiendo.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Las reglas viven en <code>ValidadorNota</code> (Kotlin puro) → se prueban sin emulador.</li>
+    <li>El botón solo comunica la intención; el ViewModel aplica las reglas.</li>
+    <li>“No guardar dos veces” es una regla del ViewModel; el botón deshabilitado es solo ayuda visual.</li>
+    <li>Un error por campo, mostrado debajo de su campo, y limpiado al editar ese campo.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 6 — Repository: cambiar datos sin cambiar la pantalla</h2>
+<p><strong>Consigna:</strong> definir un contrato <code>NotaRepository</code> con operaciones para obtener, guardar y eliminar notas. Implementar primero
+una versión en memoria. El ViewModel sólo habla con el contrato. Decidir si el resultado se devuelve como valor puntual o como <code>Flow</code> y justificarlo.
+<strong>Desafío:</strong> reemplazar la implementación por otra lista precargada sin modificar el composable.
+<br>Rama: <code>ej06-repository</code> · Archivo nuevo: <code>NotaRepository.kt</code></p>
+
+<h3>Paso 0 · ¿Para qué un Repository?</h3>
+<p>Hasta el Ej 5 el ViewModel “simulaba” guardar. Pero el ViewModel no debería saber <em>dónde</em> se guardan los datos (memoria, archivo, base de datos,
+internet): su trabajo es coordinar la pantalla. El <strong>Repository</strong> es la pieza de la capa de datos que esconde ese “dónde” detrás de un contrato.
+Es la <strong>(G)</strong> y la <strong>(H)</strong> de la tabla del Ej 1.</p>
+
+<div class="caja clave">
+  <strong class="titulo">Contrato = <code>interface</code></strong>
+  Una <code>interface</code> dice <strong>qué</strong> operaciones existen, sin decir <strong>cómo</strong> se hacen. Varias clases pueden <em>implementarla</em>
+  (<code>: NotaRepository</code>), cada una a su manera. Quien usa la interfaz no sabe ni le importa cuál le tocó.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · El contrato</h3>
+<pre>interface NotaRepository {
+    suspend fun obtenerTodas(): List&lt;Nota&gt;
+    suspend fun guardar(nota: Nota)      // si ya existe ese id, la reemplaza
+    suspend fun eliminar(id: String)
+}</pre>
+</div>
+<ul>
+  <li><strong><code>suspend</code></strong>: la operación puede tardar (disco, red) y se ejecuta dentro de una corrutina sin bloquear la pantalla.
+  Solo se puede llamar desde otra función <code>suspend</code> o desde <code>launch</code>.</li>
+  <li><strong><code>Nota</code> ahora tiene <code>id</code></strong>: con varias notas, el Repository necesita saber cuál eliminar o reemplazar.
+  El ViewModel lo genera con <code>UUID.randomUUID().toString()</code> (un identificador único al azar).</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · Dos implementaciones del mismo contrato</h3>
+<pre>class NotaRepositoryEnMemoria : NotaRepository {           // empieza vacía
+    private val notas = mutableListOf&lt;Nota&gt;()
+    override suspend fun obtenerTodas(): List&lt;Nota&gt; { delay(300); return notas.toList() }
+    override suspend fun guardar(nota: Nota) {
+        delay(300)
+        val i = notas.indexOfFirst { it.id == nota.id }
+        if (i &gt;= 0) notas[i] = nota else notas.add(nota)
+    }
+    override suspend fun eliminar(id: String) { delay(300); notas.removeAll { it.id == id } }
+}
+
+class NotaRepositoryDeEjemplo : NotaRepository {           // desafío: precargada
+    private val notas = mutableListOf(
+        Nota("ej-1", "Parcial DA1", "Repasar MVVM, StateFlow y Repository"), ...)
+    ...
+}</pre>
+</div>
+<ul>
+  <li><strong><code>override</code></strong>: “esta función cumple la que pide la interfaz”.</li>
+  <li><strong><code>notas.toList()</code></strong> devuelve una <em>copia</em>: quien la recibe no puede modificar la lista interna del Repository.</li>
+  <li><code>delay(300)</code> simula una fuente que tarda, para ver que la pantalla sigue respondiendo.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · El ViewModel recibe el contrato</h3>
+<pre>class NotaViewModel(
+    private val repositorio: NotaRepository = NotaRepositoryEnMemoria()   // ← único lugar donde se elige
+) : ViewModel() {
+
+    init { viewModelScope.launch { recargarNotas() } }
+
+    private suspend fun recargarNotas() {
+        val notas = repositorio.obtenerTodas()
+        _uiState.update { it.copy(notas = notas) }
+    }
+
+    fun onGuardar() {
+        ... // validación igual que en el Ej 5
+        viewModelScope.launch {
+            repositorio.guardar(Nota(UUID.randomUUID().toString(), titulo, contenido))
+            recargarNotas()
+            _uiState.update { it.copy(guardando = false, titulo = "", contenido = "") }
+        }
+    }
+
+    fun onEliminar(id: String) {
+        viewModelScope.launch { repositorio.eliminar(id); recargarNotas() }
+    }
+}</pre>
+</div>
+<ul>
+  <li>El tipo del parámetro es <code>NotaRepository</code> (la interfaz), <strong>no</strong> <code>NotaRepositoryEnMemoria</code>: el ViewModel solo habla con el contrato.</li>
+  <li>El valor por defecto <code>= NotaRepositoryEnMemoria()</code> es provisorio. Como todos los parámetros tienen valor por defecto, Kotlin genera un
+  constructor vacío y <code>by viewModels()</code> lo puede crear. En el <strong>Ej 11</strong> esto se reemplaza por una fábrica explícita.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 4 · La pantalla: lista con <code>LazyColumn</code></h3>
+<pre>LazyColumn(...) {
+    item { /* formulario: título, contenido, Guardar, "Notas guardadas (n)" */ }
+    items(estado.notas, key = { it.id }) { nota -&gt;
+        FilaNota(nota = nota, onEliminar = { onEliminar(nota.id) })
+    }
+}</pre>
+</div>
+<ul>
+  <li><code>LazyColumn</code> solo dibuja las filas visibles (como un <code>RecyclerView</code>). <code>item { }</code> agrega un elemento suelto (el formulario);
+  <code>items(lista) { }</code>, uno por cada nota.</li>
+  <li><code>key = { it.id }</code>: Compose identifica cada fila por su id, no por su posición; al borrar una no se “corren” las demás.</li>
+  <li><code>FilaNota</code> es un composable reutilizable para una fila. La pantalla recibe <code>List&lt;Nota&gt;</code> ya lista: <strong>no conoce al Repository</strong>.</li>
+</ul>
+
+<h3>Decisión: valor puntual (<code>suspend</code>) y no <code>Flow</code></h3>
+<table>
+  <tr><th style="width:22%"></th><th>Valor puntual (<code>suspend fun obtenerTodas(): List</code>)</th><th>Flow (<code>fun observar(): Flow&lt;List&gt;</code>)</th></tr>
+  <tr><td>Qué devuelve</td><td>Una “foto” de los datos en ese momento</td><td>Un flujo que emite cada vez que los datos cambian</td></tr>
+  <tr><td>Después de escribir</td><td>El ViewModel vuelve a pedir la foto (<code>recargarNotas()</code>)</td><td>Se actualiza solo</td></tr>
+  <tr><td>Conviene cuando</td><td>Una sola pantalla lee y escribe</td><td>Varias pantallas miran los mismos datos, o la fuente ya emite (Room)</td></tr>
+</table>
+<p><strong>Elegimos valor puntual</strong>: es más simple y explícito, y hoy hay una sola pantalla. En el <strong>Ej 12</strong> (dos pantallas) pasamos a <code>Flow</code>.</p>
+
+<div class="figs"><figure><img src="img/ej06_ejemplo.png" style="height:260px"><br>Desafío: con <code>NotaRepositoryDeEjemplo()</code><br>aparecen 3 notas sin tocar la pantalla</figure></div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th>Prueba</th><th>Resultado</th></tr>
+  <tr><td>Agregar “Parcial DA1” y “Compras”</td><td>“Notas guardadas (2)”, ambas en la lista ✅</td></tr>
+  <tr><td>Eliminar “Parcial DA1”</td><td>“Notas guardadas (1)”, queda “Compras” ✅</td></tr>
+  <tr><td>Cambiar <em>una línea</em> del ViewModel a <code>NotaRepositoryDeEjemplo()</code></td><td>Arranca con 3 notas precargadas; <code>PantallaNota.kt</code> sin cambios ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué conoce el Repository sobre Compose?</strong><br>
+Nada. No importa ninguna clase de Compose ni de la UI: recibe y devuelve <code>Nota</code> (una <code>data class</code> de Kotlin). Podría usarse igual desde
+otra interfaz, un test o un servicio en segundo plano.</p>
+<p><strong>2. ¿Por qué esta interfaz ayuda a probar la app?</strong><br>
+Porque el ViewModel depende del contrato, no de una implementación: en un test se le puede pasar un Repository <em>falso</em> con datos prefijados o
+que falle a propósito, sin archivos ni base de datos, y comprobar las reglas del ViewModel rápido y de forma repetible (eso es el <strong>Ej 13</strong>).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>interface NotaRepository</code> = contrato: qué operaciones hay, no cómo.</li>
+    <li>El ViewModel recibe <code>NotaRepository</code> por constructor y solo habla con el contrato.</li>
+    <li>Cambiar de implementación = cambiar una línea; la pantalla no se entera.</li>
+    <li>Valor puntual + recargar después de escribir: simple mientras haya una sola pantalla.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 7 — Leer un archivo de texto desde el Repository</h2>
+<p><strong>Consigna:</strong> crear <code>ArchivoTextoRepository</code> para leer <code>borrador.txt</code> desde <code>filesDir</code>. Si no existe, devolver texto vacío
+o un resultado explícito (documentar la decisión). El ViewModel solicita la lectura y publica el resultado. No abrir el archivo desde un composable.
+Distinguir archivo inexistente de una falla real; usar <code>Dispatchers.IO</code>; no guardar referencias a la Activity.
+<strong>Desafío:</strong> inspeccionar el archivo con Device Explorer.
+<br>Rama: <code>ej07-leer-archivo</code> · Archivos: <code>BorradorRepository.kt</code>, <code>BorradorViewModel.kt</code>, <code>PantallaBorrador.kt</code></p>
+
+<div class="caja ojo">
+  <strong class="titulo">Cambio de pantalla</strong>
+  Los Ej 7, 8 y 9 de la guía trabajan sobre <strong>un único borrador de texto</strong>; en el Ej 10 se vuelve a varias notas. Por eso en esta rama la app
+  es un editor de borrador (las notas, el validador y su Repository viven en las ramas anteriores).
+</div>
+
+<h3>Paso 0 · ¿Dónde se guarda? <code>filesDir</code></h3>
+<p>Cada app tiene una carpeta <strong>privada</strong> en el almacenamiento interno: <code>/data/data/com.example.mvvmlab/files/</code> (se obtiene con
+<code>context.filesDir</code>). No hace falta pedir permisos, nadie más puede leerla y se borra al desinstalar la app.</p>
+
+<div class="bloque">
+<h3>Paso 1 · Decisión documentada: resultado explícito</h3>
+<pre>sealed interface ResultadoLectura {
+    data object NoExiste : ResultadoLectura
+    data class Leido(val texto: String) : ResultadoLectura
+}</pre>
+</div>
+<p>Si el archivo no existe se devuelve <code>NoExiste</code> y <strong>no</strong> un texto vacío: “no existe” y “existe pero está vacío” son situaciones distintas,
+y con <code>""</code> no habría forma de diferenciarlas. Una <strong>falla real</strong> (permiso, disco, archivo dañado) no es un resultado: se informa con una
+<strong>excepción</strong> (<code>IOException</code>).</p>
+<div class="caja clave">
+  <strong class="titulo"><code>sealed interface</code> (teoría, diapositiva 12)</strong>
+  Restringe los subtipos a un conjunto <strong>conocido por el compilador</strong>. Un <code>when</code> sobre un <code>ResultadoLectura</code> es <em>exhaustivo</em>:
+  si mañana se agrega un caso, el compilador marca todos los <code>when</code> que no lo contemplan. <code>data object</code> = un caso sin datos;
+  <code>data class</code> = un caso con datos.
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · El Repository lee en <code>Dispatchers.IO</code></h3>
+<pre>interface BorradorRepository {
+    suspend fun leer(): ResultadoLectura
+}
+
+class ArchivoTextoRepository(carpeta: File) : BorradorRepository {
+    private val archivo = File(carpeta, "borrador.txt")
+
+    override suspend fun leer(): ResultadoLectura =
+        withContext(Dispatchers.IO) {
+            if (!archivo.exists()) ResultadoLectura.NoExiste
+            else ResultadoLectura.Leido(archivo.readText(Charsets.UTF_8))   // puede lanzar IOException
+        }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>withContext(Dispatchers.IO)</code></strong>: ejecuta el bloque en hilos pensados para disco y red. Leer un archivo en el hilo principal puede
+  congelar la pantalla (y Android lo detecta como mala práctica).</li>
+  <li><strong>Recibe un <code>File</code> (la carpeta), no un <code>Context</code> ni una Activity</strong>: es lo único que necesita. Si guardara la Activity,
+  el Repository la mantendría viva después de que Android la destruya (<em>fuga de memoria</em>).</li>
+  <li><strong><code>Charsets.UTF_8</code></strong>: se indica la codificación para que tildes y ñ se lean bien.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · El ViewModel solicita y publica</h3>
+<pre>class BorradorViewModel(private val repositorio: BorradorRepository) : ViewModel() {
+    init {
+        viewModelScope.launch {
+            try {
+                when (val r = repositorio.leer()) {
+                    is ResultadoLectura.Leido -&gt; _uiState.update { it.copy(texto = r.texto, mensaje = "Cargado desde borrador.txt") }
+                    ResultadoLectura.NoExiste -&gt; _uiState.update { it.copy(mensaje = "Todavía no hay borrador guardado") }
+                }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(mensaje = "", error = "No se pudo leer el borrador") }
+            }
+        }
+    }
+}</pre>
+</div>
+<p><code>when (val r = ...)</code> guarda el resultado en <code>r</code> y elige la rama según su tipo; dentro de <code>is ResultadoLectura.Leido</code>, Kotlin ya sabe que
+<code>r</code> tiene <code>texto</code> (<em>smart cast</em>). La pantalla nunca toca el sistema de archivos: recibe <code>BorradorUiState</code>.</p>
+
+<div class="bloque">
+<h3>Paso 4 · La fábrica: cómo se construye un ViewModel con parámetros</h3>
+<pre>companion object {
+    val Factory: ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            val app = checkNotNull(this[APPLICATION_KEY])
+            BorradorViewModel(ArchivoTextoRepository(app.filesDir))
+        }
+    }
+}
+// En MainActivity:
+private val borradorViewModel: BorradorViewModel by viewModels { BorradorViewModel.Factory }</pre>
+</div>
+<p>Ahora el ViewModel <strong>recibe</strong> un repositorio que necesita <code>filesDir</code>, y Android no sabe crearlo solo. La <strong>fábrica</strong> le explica cómo.
+Usa el <code>Application</code> (vive lo que vive la app, no una pantalla) solo para obtener <code>filesDir</code>. <code>viewModelFactory</code> ya venía en
+<code>lifecycle-viewmodel</code>: no se agregaron dependencias. En el <strong>Ej 11</strong> esto se ordena en un único lugar.</p>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:42%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Abrir sin <code>borrador.txt</code></td><td>“Todavía no hay borrador guardado” (caso <code>NoExiste</code>) ✅</td></tr>
+  <tr><td>Crear el archivo (<code>adb shell run-as ... printf ... &gt; files/borrador.txt</code>) con tres líneas, tildes y “ñandú”, y reabrir</td><td>El texto aparece completo al abrir la pantalla ✅</td></tr>
+  <tr><td>Falla real: reemplazar <code>borrador.txt</code> por una <em>carpeta</em></td><td>“No se pudo leer el borrador”; Logcat: <code>FileNotFoundException ... EISDIR (Is a directory)</code>. La app no se cierra ✅</td></tr>
+</table>
+<div class="figs"><figure><img src="img/ej07_leido.png" style="height:250px"><br>Borrador escrito previamente en el archivo,<br>cargado al abrir la pantalla</figure></div>
+
+<div class="caja regla">
+  <strong class="titulo">Desafío: Device Explorer</strong>
+  En Android Studio: <em>View → Tool Windows → Device Explorer</em> → <code>data/data/com.example.mvvmlab/files/borrador.txt</code>. Doble click lo abre;
+  click derecho → <em>Upload</em> permite subir un archivo propio para probar. Equivalente por consola:
+  <code>adb shell run-as com.example.mvvmlab cat files/borrador.txt</code>.
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Dónde está físicamente el archivo?</strong><br>
+En el almacenamiento interno del dispositivo, en la carpeta privada de la app: <code>/data/data/com.example.mvvmlab/files/borrador.txt</code>
+(también visible como <code>/data/user/0/...</code>). Se borra al desinstalar la app.</p>
+<p><strong>2. ¿Otra app puede leerlo sin más?</strong><br>
+No. Cada app corre con su propio usuario de Linux y la carpeta <code>/data/data/&lt;paquete&gt;</code> solo es accesible para ese usuario (<em>sandbox</em>).
+Otra app no puede abrirla aunque conozca la ruta; para compartir el contenido habría que hacerlo explícitamente (por ejemplo con un Intent, Ej 15).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>filesDir</code> = carpeta privada de la app, sin permisos.</li>
+    <li>Tres casos distintos: <code>NoExiste</code>, <code>Leido(texto)</code> y excepción (falla real).</li>
+    <li>El Repository lee en <code>Dispatchers.IO</code> y recibe la carpeta, no la Activity.</li>
+    <li>El ViewModel pide y publica; la UI no toca archivos. Una fábrica construye el ViewModel con su Repository.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 8 — Guardar texto, cerrar y volver</h2>
+<p><strong>Consigna:</strong> agregar al Repository la escritura del borrador en UTF-8. Escribir varias líneas, guardar, cerrar completamente la app y
+volver a abrirla: debe recuperarse el contenido. Elegir y documentar si se sobrescribe todo el archivo o se agrega al final.
+<strong>Desafío:</strong> botón “Descartar cambios” que vuelva a leer la versión guardada.
+<br>Rama: <code>ej08-guardar-archivo</code></p>
+
+<div class="bloque">
+<h3>Paso 1 · El contrato crece: <code>guardar(texto)</code></h3>
+<pre>interface BorradorRepository {
+    suspend fun leer(): ResultadoLectura
+    suspend fun guardar(texto: String)
+}
+
+override suspend fun guardar(texto: String) {
+    withContext(Dispatchers.IO) {                    // fuera del hilo principal
+        archivo.writeText(texto, Charsets.UTF_8)     // crea o REEMPLAZA el archivo
+    }
+}</pre>
+</div>
+<div class="caja clave">
+  <strong class="titulo">Decisión documentada: sobrescribir</strong>
+  Un borrador representa “el texto actual”, no un historial. Con <code>appendText</code> (agregar al final) cada guardado duplicaría el contenido anterior.
+  <code>writeText</code> crea el archivo si no existe y reemplaza lo que tenía. (Agregar al final serviría para un <em>log</em> o una bitácora de eventos.)
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · Estado: lo que se ve vs. lo que hay en disco</h3>
+<pre>data class BorradorUiState(
+    val texto: String = "",           // lo que está en el editor AHORA
+    val textoGuardado: String = "",   // lo que hay en DISCO (última lectura/escritura)
+    val guardando: Boolean = false,
+    val mensaje: String = "Leyendo borrador...",
+    val error: String? = null
+) {
+    val hayCambiosSinGuardar: Boolean get() = texto != textoGuardado
+}</pre>
+</div>
+<p>Es la misma idea del Ej 2 (“lo escrito no es lo guardado”), ahora con un disco real detrás. <code>hayCambiosSinGuardar</code> es calculada:
+se deduce comparando, no se guarda aparte.</p>
+
+<div class="bloque">
+<h3>Paso 3 · El ViewModel guarda y recién después confirma</h3>
+<pre>fun onGuardar() {
+    val actual = _uiState.value
+    if (actual.guardando) return
+    _uiState.update { it.copy(guardando = true, error = null) }
+    viewModelScope.launch {
+        try {
+            repositorio.guardar(actual.texto)
+            _uiState.update { it.copy(guardando = false, textoGuardado = actual.texto,
+                                      mensaje = "Guardado en borrador.txt") }   // DESPUÉS de escribir
+        } catch (e: IOException) {
+            _uiState.update { it.copy(guardando = false, error = "No se pudo guardar el borrador") }
+        }
+    }
+}
+
+fun onDescartarCambios() = cargarDesdeDisco()    // desafío: relee el archivo</pre>
+</div>
+<p><code>textoGuardado</code> se actualiza <strong>después</strong> de que <code>guardar</code> terminó sin error: si la escritura falla, la pantalla sigue mostrando
+“sin guardar”, que es la verdad. <code>cargarDesdeDisco()</code> es la misma función que se usa al abrir: descartar = volver a leer lo que hay en disco.</p>
+
+<div class="figs"><figure><img src="img/ej08_singuardar.png" style="height:260px"><br>Distinción visual: chip “● Sin guardar”,<br>etiqueta “Texto (sin guardar)” y botones activos</figure></div>
+<p>Con el texto igual al de disco se ve “✓ Guardado” y los botones Guardar/Descartar quedan deshabilitados (no hay nada que guardar ni descartar).</p>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:44%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Escribir 3 líneas (con Enter) → Guardar</td><td>“✓ Guardado”; <code>cat files/borrador.txt</code> muestra las 3 líneas ✅</td></tr>
+  <tr><td>Cerrar completamente (<code>am force-stop</code>) y volver a abrir</td><td>“Cargado desde borrador.txt” con las 3 líneas ✅</td></tr>
+  <tr><td>Archivo con “Canción: ñandú / Título con acentos áéíóú”, editar y Guardar</td><td>Tildes, ñ y salto de línea intactos; bytes UTF-8 (<code>303 263</code> = ó) ✅</td></tr>
+  <tr><td>Editar → Descartar cambios</td><td>Vuelve exactamente al texto del archivo, “✓ Guardado” ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué diferencia hay entre estado del ViewModel y datos en disco?</strong><br>
+El estado del ViewModel (<code>texto</code>) está en <strong>memoria</strong>: cambia en cada tecla, sobrevive a la rotación pero se pierde si muere el proceso.
+Los datos en disco (<code>borrador.txt</code>) son <strong>persistentes</strong>: sobreviven a cerrar la app y reiniciar el teléfono, pero solo cambian cuando se
+guarda explícitamente. Por eso pueden diferir, y esa diferencia es “cambios sin guardar”.</p>
+<p><strong>2. ¿Qué pasa con caracteres acentuados y saltos de línea?</strong><br>
+Se conservan siempre que se use <strong>la misma codificación al escribir y al leer</strong> (UTF-8 en ambos). En UTF-8 una letra acentuada ocupa 2 bytes;
+si se leyera con otra codificación (por ejemplo ISO-8859-1) aparecerían caracteres raros (“CanciÃ³n”). Los saltos de línea se guardan como el carácter
+<code>\n</code> y vuelven igual.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>writeText(texto, UTF_8)</code> en <code>Dispatchers.IO</code>: sobrescribe el borrador.</li>
+    <li><code>texto</code> (memoria) ≠ <code>textoGuardado</code> (disco) → “sin guardar”.</li>
+    <li>Se confirma “Guardado” solo después de escribir sin error.</li>
+    <li>Descartar = volver a leer el archivo.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 9 — Cargando, listo o falló</h2>
+<p><strong>Consigna:</strong> modelar un estado de carga y uno de error para las operaciones de lectura/escritura. Usar <code>viewModelScope</code> para iniciar
+el trabajo y despachar el acceso a disco en IO. Evitar que una excepción cierre la app. Para comprobar la ruta de error, usar temporalmente un Repository
+de prueba que lance una excepción controlada (no alterar permisos). <strong>Desafío:</strong> ofrecer Reintentar si la carga falla.
+<br>Rama: <code>ej09-carga-error</code> · Archivo nuevo: <code>RepositorioQueFalla.kt</code></p>
+
+<h3>Paso 0 · El problema de las banderas sueltas</h3>
+<p>Con <code>cargando: Boolean</code>, <code>error: String?</code> y <code>texto</code> por separado se pueden armar combinaciones absurdas: ¿qué muestra la pantalla si
+<code>cargando = true</code> <em>y</em> <code>error != null</code>? La teoría (diapositiva 12) propone un <strong>tipo sellado</strong>: cada operación está en
+<em>exactamente uno</em> de sus estados posibles.</p>
+
+<div class="bloque">
+<h3>Paso 1 · Dos tipos sellados: lectura y guardado</h3>
+<pre>sealed interface EstadoCarga {
+    data object Cargando : EstadoCarga
+    data object Listo : EstadoCarga
+    data class Error(val mensaje: String) : EstadoCarga
+}
+
+sealed interface EstadoGuardado {
+    data object Inactivo : EstadoGuardado     // todavía no se intentó
+    data object Guardando : EstadoGuardado
+    data object Guardado : EstadoGuardado     // SOLO después de completar la escritura
+    data class Error(val mensaje: String) : EstadoGuardado
+}
+
+data class BorradorUiState(
+    val carga: EstadoCarga = EstadoCarga.Cargando,
+    val guardado: EstadoGuardado = EstadoGuardado.Inactivo,
+    val texto: String = "", val textoGuardado: String = "", val existeArchivo: Boolean = false
+) {
+    val puedeEditar: Boolean get() = carga == EstadoCarga.Listo
+    val puedeGuardar: Boolean get() = puedeEditar &amp;&amp; hayCambiosSinGuardar &amp;&amp; guardado != EstadoGuardado.Guardando
+}</pre>
+</div>
+<p>Son dos tipos porque son dos operaciones independientes: puede fallar el guardado con la carga en <code>Listo</code>. Las propiedades calculadas
+(<code>puedeEditar</code>, <code>puedeGuardar</code>) dejan las reglas en el estado y no en la vista.</p>
+
+<div class="bloque">
+<h3>Paso 2 · El ViewModel: <code>viewModelScope</code> + IO + <code>try/catch</code></h3>
+<pre>private fun cargar() {
+    _uiState.update { it.copy(carga = EstadoCarga.Cargando) }
+    viewModelScope.launch {                       // inicia el trabajo
+        try {
+            val r = repositorio.leer()            // el Repository usa withContext(Dispatchers.IO)
+            _uiState.update { it.copy(carga = EstadoCarga.Listo, texto = ..., textoGuardado = ...) }
+        } catch (e: IOException) {
+            _uiState.update { it.copy(carga = EstadoCarga.Error("No se pudo leer el borrador.")) }
+        }
+    }
+}
+fun onReintentar() = cargar()                     // desafío</pre>
+</div>
+<ul>
+  <li><strong>Quién hace qué con los hilos:</strong> el ViewModel <em>inicia</em> con <code>viewModelScope.launch</code> (hilo principal); el Repository <em>despacha</em>
+  el disco con <code>withContext(Dispatchers.IO)</code>. El ViewModel no necesita saber que hay un disco.</li>
+  <li><strong>La excepción se captura</strong> y se convierte en estado: la app no se cierra y el usuario ve qué pasó.</li>
+  <li><strong><code>onReintentar</code></strong> reutiliza la misma función de carga.</li>
+</ul>
+<div class="caja ojo">
+  <strong class="titulo">¿Qué excepción NO conviene capturar silenciosamente?</strong>
+  <code>CancellationException</code>. Es la forma en que Kotlin <strong>cancela</strong> una corrutina (por ejemplo, cuando el ViewModel se destruye y
+  <code>viewModelScope</code> se cancela). Un <code>catch (e: Exception)</code> genérico la atraparía, la corrutina seguiría corriendo como si nada y se podría
+  mostrar un error falso. Por eso se captura <strong>solo <code>IOException</code></strong> (las fallas de disco esperables). Si alguna vez se captura
+  <code>Exception</code>, hay que relanzar la cancelación: <code>catch (e: CancellationException) { throw e }</code>.
+</div>
+
+<div class="bloque">
+<h3>Paso 3 · Repository de prueba que falla (sin tocar permisos)</h3>
+<pre>class RepositorioQueFalla(
+    private var fallasDeLectura: Int = 1,        // la 1ª lectura falla, la 2ª funciona → probar Reintentar
+    private val fallarEscritura: Boolean = true,
+    private val demoraMs: Long = 1200            // para ver "Cargando..." en pantalla
+) : BorradorRepository {
+    override suspend fun leer(): ResultadoLectura {
+        delay(demoraMs)
+        if (fallasDeLectura &gt; 0) { fallasDeLectura--; throw IOException("Falla de lectura simulada") }
+        ...
+    }
+    override suspend fun guardar(texto: String) {
+        delay(demoraMs)
+        if (fallarEscritura) throw IOException("Falla de escritura simulada")
+    }
+}
+// Se activa con una constante en la fábrica:
+const val USAR_REPOSITORIO_QUE_FALLA = false</pre>
+</div>
+<p>Es otra implementación del <strong>mismo contrato</strong>: el ViewModel y la pantalla no cambian. Esto es lo que el Ej 6 anticipaba (“la interfaz ayuda a probar”).</p>
+
+<div class="figs">
+  <figure><img src="img/ej09_cargando.png" style="height:230px"><br>Cargando<br>(editor deshabilitado)</figure>
+  <figure><img src="img/ej09_error.png" style="height:230px"><br>Falló la carga<br>→ Reintentar</figure>
+  <figure><img src="img/ej09_error_guardar.png" style="height:230px"><br>Falló el guardado:<br>el texto sigue en pantalla</figure>
+</div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:44%">Prueba (con <code>RepositorioQueFalla</code>)</th><th>Resultado</th></tr>
+  <tr><td>Abrir la app</td><td>“Cargando borrador...” con indicador; editor y botones deshabilitados ✅</td></tr>
+  <tr><td>Termina la lectura (falla)</td><td>Tarjeta roja “No se pudo leer el borrador.” + <strong>Reintentar</strong>; la app no se cierra ✅</td></tr>
+  <tr><td>Reintentar</td><td>Vuelve a “Cargando...” y luego muestra el texto ✅</td></tr>
+  <tr><td>Editar → Guardar (escritura falla)</td><td>“Guardando...” y después “No se pudo guardar. Tus cambios siguen en pantalla.”; el texto editado se conserva ✅</td></tr>
+  <tr><td>Con el repositorio real (<code>false</code>)</td><td>Carga el archivo, Guardar → “✓ Guardado” y el archivo cambia ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué excepción no conviene capturar silenciosamente?</strong><br>
+<code>CancellationException</code> (ver recuadro): es el mecanismo de cancelación de las corrutinas. Tampoco conviene un <code>catch</code> genérico que “trague”
+cualquier error sin mostrarlo ni registrarlo: el problema queda oculto. Acá cada falla se registra en Logcat <em>y</em> se muestra al usuario.</p>
+<p><strong>2. ¿Por qué un mensaje “Guardado” sólo corresponde después de completar la escritura?</strong><br>
+Porque si se mostrara al <em>pedir</em> guardar y la escritura fallara, el usuario creería que sus datos están a salvo, cerraría la app y los perdería.
+El estado tiene que describir la verdad: <code>Guardando</code> mientras se escribe, <code>Guardado</code> solo cuando <code>guardar()</code> terminó sin excepción,
+<code>Error</code> si falló.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Tipos sellados (<code>EstadoCarga</code>, <code>EstadoGuardado</code>) en vez de banderas sueltas; <code>when</code> exhaustivo en la vista.</li>
+    <li>ViewModel inicia con <code>viewModelScope</code>; el Repository despacha el disco en IO.</li>
+    <li>Capturar <code>IOException</code>, nunca silenciar <code>CancellationException</code>.</li>
+    <li>“Guardado” solo después de escribir. Reintentar reutiliza la carga.</li>
+    <li>Las fallas se prueban con un Repository falso, no tocando el dispositivo.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 10 — De un texto a una lista persistente</h2>
+<p><strong>Consigna:</strong> extender el ejercicio a varias notas. Elegir un formato de texto claro y documentado para persistirlas (JSON textual o registros
+con escape bien definido; no <code>split(";")</code> si el usuario puede escribir punto y coma). Implementar lectura, alta, edición y borrado a través del
+Repository. <strong>Desafío:</strong> escribir primero en un temporal y sustituir el destino sólo cuando la nueva versión esté completa.
+<br>Rama: <code>ej10-lista-persistente</code> · Archivos: <code>NotaRepository.kt</code> (contrato + <code>ArchivoNotasRepository</code>), <code>NotasViewModel.kt</code>,
+<code>PantallaNotas.kt</code>, <code>ValidadorNota.kt</code> (vuelve del Ej 5)</p>
+
+<h3>Paso 0 · ¿Por qué no <code>split(";")</code>?</h3>
+<p>Si cada nota se guardara como <code>titulo;contenido</code> en una línea, una nota con contenido <code>"Linea 2; con punto y coma"</code> se partiría en dos campos,
+y un salto de línea partiría la nota en dos registros. Hace falta un formato que defina cómo <strong>escapar</strong> los caracteres especiales.</p>
+
+<div class="bloque">
+<h3>Paso 1 · Formato documentado: <code>notas.json</code></h3>
+<pre>{
+  "version": 1,
+  "notas": [
+    { "id": "24d7e63e-...", "titulo": "Parcial DA1", "contenido": "Linea 1\nLinea 2; con punto y coma" },
+    { "id": "507e3e76-...", "titulo": "Cita",        "contenido": "Dijo: \"usa JSON\" y ya" }
+  ]
+}</pre>
+</div>
+<table>
+  <tr><th style="width:30%">Decisión</th><th>Por qué</th></tr>
+  <tr><td>JSON (con <code>org.json</code>)</td><td>Define el escape: <code>\n</code> para salto de línea, <code>\"</code> para comillas, <code>\\</code> para la barra. El <code>;</code> no es especial.
+  <code>org.json</code> viene incluido en Android: <strong>sin dependencias nuevas</strong>.</td></tr>
+  <tr><td>Campo vacío = <code>""</code></td><td>Una nota vacía se representa con cadenas vacías, nunca omitiendo el campo ni con <code>null</code> (igual, el validador no deja guardarlas).</td></tr>
+  <tr><td><code>"version": 1</code></td><td>Si mañana cambia el formato, el lector sabe qué versión está leyendo.</td></tr>
+  <tr><td>Archivo inexistente = lista vacía</td><td>Es la primera vez que se usa la app: no es un error.</td></tr>
+  <tr><td>Contenido corrupto = <strong>error</strong>, no lista vacía</td><td>Ver Paso 3.</td></tr>
+</table>
+
+<div class="bloque">
+<h3>Paso 2 · El Repository: leer todo → modificar → escribir todo</h3>
+<pre>class ArchivoNotasRepository(carpeta: File) : NotaRepository {
+    private val mutex = Mutex()
+
+    override suspend fun obtenerTodas() = mutex.withLock { leerArchivo() }
+
+    override suspend fun guardar(nota: Nota) = mutex.withLock {      // alta o edición
+        val notas = leerArchivo().toMutableList()
+        val i = notas.indexOfFirst { it.id == nota.id }
+        if (i &gt;= 0) notas[i] = nota else notas.add(nota)
+        escribirArchivo(notas)
+    }
+
+    override suspend fun eliminar(id: String) = mutex.withLock {
+        escribirArchivo(leerArchivo().filterNot { it.id == id })
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong>El contrato es el mismo del Ej 6</strong> (<code>obtenerTodas</code>, <code>guardar</code>, <code>eliminar</code>): cambió la implementación, de memoria a archivo.</li>
+  <li><strong><code>guardar</code> sirve para alta y edición</strong>: si el id ya existe, reemplaza; si no, agrega.</li>
+  <li><strong><code>Mutex</code></strong>: cada operación es “leer, modificar, escribir”. Si dos se mezclaran (borrar mientras se guarda), una pisaría a la otra.
+  <code>mutex.withLock { }</code> hace que se ejecuten de a una.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Lector robusto: contenido incompleto</h3>
+<pre>try {
+    val raiz = JSONObject(texto)
+    ...
+} catch (e: JSONException) {
+    throw FormatoInvalidoException("El archivo notas.json tiene un formato inválido", e)
+}
+class FormatoInvalidoException(...) : IOException(...)</pre>
+</div>
+<div class="caja ojo">
+  <strong class="titulo">¿Por qué no devolver una lista vacía si el archivo está dañado?</strong>
+  Porque el próximo <code>guardar</code> haría “leer (vacío) → agregar una → escribir” y <strong>borraría todas las notas</strong> que quedaban en el archivo.
+  Al lanzar una excepción, el ViewModel muestra el error con <em>Reintentar</em> y el formulario queda deshabilitado: el archivo no se toca.
+  <code>FormatoInvalidoException</code> extiende <code>IOException</code>, así que el ViewModel la maneja igual que cualquier falla de lectura (Ej 9).
+</div>
+
+<div class="bloque">
+<h3>Paso 4 · Desafío: escritura segura con temporal</h3>
+<pre>private suspend fun escribirArchivo(notas: List&lt;Nota&gt;) = withContext(Dispatchers.IO) {
+    val raiz = JSONObject().put("version", 1).put("notas", array)
+    temporal.writeText(raiz.toString(2), Charsets.UTF_8)     // 1. versión nueva COMPLETA en notas.json.tmp
+    if (!temporal.renameTo(archivo))                          // 2. reemplazo atómico
+        throw IOException("No se pudo reemplazar notas.json")
+}</pre>
+</div>
+<p>Si la app se corta a mitad de la escritura (batería, Android mata el proceso), solo queda un <code>.tmp</code> a medias y <code>notas.json</code> sigue intacto.
+Renombrar dentro de la misma carpeta es <strong>atómico</strong>: el archivo final es la versión vieja completa o la nueva completa, nunca una mezcla.</p>
+
+<div class="bloque">
+<h3>Paso 5 · ViewModel: un formulario para alta y edición</h3>
+<pre>data class NotasUiState(
+    val carga: EstadoCarga = EstadoCarga.Cargando,
+    val notas: List&lt;Nota&gt; = emptyList(),
+    val editandoId: String? = null,     // null = nota nueva; si no, la que se edita
+    val titulo: String = "", val contenido: String = "",
+    val errorTitulo: String? = null, val errorContenido: String? = null,
+    val procesando: Boolean = false, val errorOperacion: String? = null
+)
+
+fun onEditar(nota: Nota)  // copia la nota al formulario (editandoId = nota.id)
+fun onGuardar()           // valida; id = editandoId ?: UUID nuevo; repositorio.guardar(nota)
+fun onEliminar(id: String)
+
+private fun ejecutar(mensajeError: String, operacion: suspend () -&gt; Unit) {
+    // procesando = true → operacion() → recargar desde el Repository → procesando = false
+    // si falla: errorOperacion = mensajeError
+}</pre>
+</div>
+<p><code>ejecutar</code> recibe una <strong>función suspend como parámetro</strong> (<code>suspend () -&gt; Unit</code>): evita repetir el mismo try/catch en guardar y eliminar.
+Después de cada operación se vuelve a leer del Repository: la lista mostrada es siempre la del archivo (<strong>fuente de verdad</strong>).</p>
+
+<div class="figs">
+  <figure><img src="img/ej10_editando.png" style="height:250px"><br>Editando una nota<br>(fila resaltada, “Guardar cambios”)</figure>
+  <figure><img src="img/ej10_corrupto.png" style="height:250px"><br>notas.json truncado:<br>error + Reintentar, archivo intacto</figure>
+</div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:44%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Alta de 3 notas: con salto de línea y <code>;</code>, con comillas, con comas</td><td>“Notas guardadas (3)”; en el JSON: <code>\n</code> y <code>\"</code> escapados ✅</td></tr>
+  <tr><td>Eliminar “Cita”</td><td>Quedan 2 ✅</td></tr>
+  <tr><td>Editar “Compras” → agregar “y mate” → Guardar cambios</td><td>Se reemplaza la misma nota (mismo id) ✅</td></tr>
+  <tr><td><code>am force-stop</code> y reabrir</td><td>Las 2 notas con saltos de línea y puntuación intactos ✅</td></tr>
+  <tr><td><code>notas.json</code> truncado a 60 bytes</td><td>“El archivo notas.json tiene un formato inválido” + Reintentar; el archivo no se sobrescribe ✅</td></tr>
+  <tr><td><code>ValidadorNotaTest</code></td><td>5/5 ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Cómo se representa una nota vacía?</strong><br>
+Con cadenas vacías: <code>{"id": "...", "titulo": "", "contenido": ""}</code>. Los campos siempre están presentes (nunca omitidos ni <code>null</code>), así el lector
+no tiene casos especiales. En la práctica el validador impide guardarlas.</p>
+<p><strong>2. ¿Qué hace el lector si el contenido está incompleto?</strong><br>
+<code>JSONObject</code> lanza <code>JSONException</code>; el Repository la convierte en <code>FormatoInvalidoException</code> (una <code>IOException</code>). El ViewModel muestra
+el error con Reintentar y bloquea el formulario. No devuelve lista vacía para no pisar el archivo en el próximo guardado.</p>
+<p><strong>3. ¿Qué se perdería si se reescribe mal el archivo?</strong><br>
+<strong>Todas</strong> las notas: el archivo se reescribe entero en cada operación. Un corte a mitad de escritura dejaría un JSON truncado e ilegible. Por eso
+el desafío: escribir en <code>.tmp</code> y renombrar recién cuando está completo.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Formato JSON documentado: escapa <code>;</code>, comillas y saltos de línea; versión; campos siempre presentes.</li>
+    <li>Mismo contrato <code>NotaRepository</code>, nueva implementación con archivo; <code>Mutex</code> para leer-modificar-escribir.</li>
+    <li>Archivo corrupto → error, nunca lista vacía.</li>
+    <li>Escritura segura: temporal + renombrado atómico.</li>
+    <li>Un formulario para alta y edición (<code>editandoId</code>).</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 11 — Dependencias: ¿quién crea el Repository?</h2>
+<p><strong>Consigna:</strong> revisar dónde se construyen el Repository y el ViewModel. Crear una forma sencilla de suministrar la dependencia desde la capa
+de aplicación (una fábrica explícita alcanza). El ViewModel debe recibir el contrato, no crear un archivo usando un Context tomado de la UI. Si se usa
+<code>AndroidViewModel</code>, justificar. <strong>Desafío:</strong> alternar entre Repository en memoria y de archivos mediante una única decisión de configuración.
+<br>Rama: <code>ej11-dependencias</code> · Archivos nuevos: <code>ContenedorApp.kt</code>, <code>NotaRepositoryEnMemoria.kt</code></p>
+
+<h3>Paso 0 · ¿Dónde se construía todo hasta ahora?</h3>
+<table>
+  <tr><th style="width:18%">Ejercicio</th><th>Quién creaba el Repository</th><th style="width:34%">Problema</th></tr>
+  <tr><td>Ej 6</td><td>Valor por defecto en el constructor del ViewModel</td><td>El ViewModel elegía su propia implementación</td></tr>
+  <tr><td>Ej 7–10</td><td>La fábrica de cada ViewModel: <code>ArchivoNotasRepository(app.filesDir)</code></td><td>Cada fábrica crea <em>su</em> Repository: con dos ViewModels habría dos instancias distintas</td></tr>
+</table>
+
+<div class="caja clave">
+  <strong class="titulo">Inyección de dependencias (a mano)</strong>
+  Una pieza <strong>no crea</strong> lo que necesita: lo <strong>recibe</strong> (por constructor). Otro lugar, uno solo, se encarga de construir y
+  conectar las piezas. Hilt o Koin automatizan esto; acá se hace “a mano” con un <strong>contenedor</strong>, que alcanza para una app chica.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · El contenedor y la única decisión de configuración</h3>
+<pre>enum class OrigenDatos { MEMORIA, ARCHIVO }
+
+class ContenedorApp(private val app: Application) {
+
+    val origenDatos: OrigenDatos = OrigenDatos.ARCHIVO      // ← ÚNICA decisión (desafío)
+
+    val notaRepository: NotaRepository by lazy {
+        when (origenDatos) {
+            OrigenDatos.MEMORIA -&gt; NotaRepositoryEnMemoria()
+            OrigenDatos.ARCHIVO -&gt; ArchivoNotasRepository(app.filesDir)
+        }
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>enum class</code></strong>: un tipo con un conjunto fijo de valores. El <code>when</code> es exhaustivo.</li>
+  <li><strong><code>by lazy { }</code></strong>: se construye la primera vez que alguien lo pide y después devuelve <strong>siempre la misma instancia</strong>.
+  No se crea en cada recomposición ni en cada ViewModel.</li>
+  <li>El tipo declarado es <code>NotaRepository</code> (el contrato): quien lo use no sabe cuál de las dos implementaciones recibió.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · ¿Dónde vive el contenedor? En la <code>Application</code></h3>
+<pre>class MvvmLabApp : Application() {
+    lateinit var contenedor: ContenedorApp
+        private set
+    override fun onCreate() {
+        super.onCreate()
+        contenedor = ContenedorApp(this)
+    }
+}
+
+&lt;!-- AndroidManifest.xml --&gt;
+&lt;application android:name=".MvvmLabApp" ...&gt;</pre>
+</div>
+<p>Android crea la <code>Application</code> <strong>antes que cualquier Activity</strong> y la mantiene mientras viva el proceso: es la “capa de aplicación”.
+Una Activity se destruye al rotar; la Application no. <code>lateinit var</code> = “se inicializa después (en <code>onCreate</code>), pero antes de usarse”.</p>
+
+<div class="bloque">
+<h3>Paso 3 · La fábrica pide, no construye</h3>
+<pre>val Factory: ViewModelProvider.Factory = viewModelFactory {
+    initializer {
+        val app = checkNotNull(this[APPLICATION_KEY]) as MvvmLabApp
+        NotasViewModel(app.contenedor.notaRepository)     // recibe el CONTRATO ya armado
+    }
+}</pre>
+</div>
+<p><code>NotasViewModel</code>, <code>PantallaNotas</code> y <code>MainActivity</code> no cambiaron: el ViewModel ya recibía <code>NotaRepository</code> por constructor. Lo único que
+cambió es <strong>quién</strong> lo construye.</p>
+<div class="caja ojo">
+  <strong class="titulo">¿Y <code>AndroidViewModel</code>?</strong>
+  <code>AndroidViewModel</code> es un ViewModel que recibe el <code>Application</code> (y por lo tanto un <code>Context</code>). <strong>No se usa</strong>: este ViewModel no
+  necesita Context para nada; solo lo usaríamos para construir el Repository adentro, que es justamente lo que queremos evitar. Además, un ViewModel
+  sin Context se prueba con JUnit puro (Ej 13).
+</div>
+
+<h3>Diagrama</h3>
+<pre>MvvmLabApp (Application, 1 vez)
+  └─ ContenedorApp ── origenDatos = ARCHIVO
+        └─ notaRepository (by lazy, UNA instancia) : NotaRepository
+              └─ NotasViewModel.Factory ──► NotasViewModel(repositorio)
+                                                 └─ PantallaNotas (estado ↓ / eventos ↑)</pre>
+
+<h3>Pruebas en el emulador (desafío)</h3>
+<table>
+  <tr><th style="width:40%">Configuración</th><th>Resultado</th></tr>
+  <tr><td><code>OrigenDatos.ARCHIVO</code></td><td>Muestra las 2 notas que ya estaban en <code>notas.json</code> ✅</td></tr>
+  <tr><td>Cambiar <em>una línea</em> a <code>OrigenDatos.MEMORIA</code></td><td>Arranca sin notas; se agrega una → “Notas guardadas (1)” ✅</td></tr>
+  <tr><td><code>MEMORIA</code> + <code>force-stop</code> y reabrir</td><td>Sin notas: la memoria se perdió con el proceso ✅</td></tr>
+  <tr><td>Volver a <code>ARCHIVO</code></td><td>Las 2 notas del archivo siguen ahí (nunca se tocaron) ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué se ganaría al reemplazar el Repository sin tocar el ViewModel?</strong><br>
+Que el ViewModel (y su lógica: validaciones, estados de carga, errores) queda probado y estable aunque cambie el almacenamiento: memoria → archivo →
+Room → red. Se puede usar uno en memoria para desarrollar, uno falso para tests (Ej 13) y el real en la app, cambiando una sola línea.</p>
+<p><strong>2. ¿Qué instancia debe compartir la app?</strong><br>
+<strong>Una sola instancia de cada Repository</strong> para toda la app. Si cada ViewModel creara el suyo: con <code>NotaRepositoryEnMemoria</code> cada uno tendría
+<em>su propia lista</em> (dos pantallas mostrarían datos distintos); con <code>ArchivoNotasRepository</code> cada uno tendría <em>su propio Mutex</em>, y dos
+escrituras simultáneas podrían pisarse. Una instancia = una fuente de verdad. Los ViewModels, en cambio, son uno por pantalla.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Las piezas reciben sus dependencias; el contenedor las construye en un solo lugar.</li>
+    <li>El contenedor vive en la <code>Application</code> (capa de aplicación, una vez por proceso).</li>
+    <li><code>by lazy</code>: una única instancia de Repository compartida.</li>
+    <li>La fábrica pide el contrato al contenedor; el ViewModel no sabe cuál recibe.</li>
+    <li>Cambiar de origen de datos = una línea (<code>origenDatos</code>).</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 12 — Dos pantallas, una información</h2>
+<p><strong>Consigna:</strong> separar la lista de notas y el detalle/editor. Al guardar desde el detalle, la lista debe mostrar lo actualizado al regresar.
+Mantener una fuente de verdad en el Repository y definir cuándo refrescar o emitir cambios. No pasar objetos gigantes como argumentos de navegación;
+pasar un identificador. <strong>Desafío:</strong> volver atrás con cambios sin guardar y decidir qué debería preguntar la interfaz.
+<br>Rama: <code>ej12-dos-pantallas</code> · Archivos: <code>NotaRepository.kt</code>, <code>ListaNotasViewModel.kt</code>, <code>DetalleNotaViewModel.kt</code>,
+<code>Pantallas.kt</code>, <code>NavegacionApp.kt</code></p>
+
+<h3>Paso 0 · El problema de las dos copias</h3>
+<p>Con el contrato del Ej 6 (<code>obtenerTodas()</code>, una “foto”), la lista pediría su foto al abrirse, el detalle guardaría una nota… y al volver,
+la lista seguiría mostrando su foto vieja. Habría <strong>dos versiones contradictorias</strong>. Solución: una sola fuente de verdad (el Repository) que
+<strong>emite</strong> cada cambio.</p>
+
+<div class="bloque">
+<h3>Paso 1 · El contrato pasa a <code>Flow</code> (decisión del Ej 6, revisada)</h3>
+<pre>interface NotaRepository {
+    fun observarTodas(): Flow&lt;List&lt;Nota&gt;&gt;    // emite la lista actual y cada cambio
+    suspend fun obtener(id: String): Nota?    // una nota puntual (para el detalle)
+    suspend fun guardar(nota: Nota)
+    suspend fun eliminar(id: String)
+}</pre>
+</div>
+<p>En el Ej 6 se dijo: “Flow conviene cuando varias pantallas miran los mismos datos”. Ahora es el caso. <code>observarTodas</code> <strong>no</strong> es
+<code>suspend</code>: devuelve un flujo al que uno se suscribe.</p>
+
+<div class="bloque">
+<h3>Paso 2 · Implementación: un <code>MutableStateFlow</code> como espejo del disco</h3>
+<pre>private val notas = MutableStateFlow&lt;List&lt;Nota&gt;?&gt;(null)        // null = todavía no se leyó
+
+override fun observarTodas() = notas.onStart { cargarSiHaceFalta() }.filterNotNull()
+
+override suspend fun guardar(nota: Nota) = mutex.withLock {
+    val lista = ...                    // leer-modificar (igual que el Ej 10)
+    escribirArchivo(lista)             // 1. primero disco (temporal + renombrado)
+    notas.value = lista                // 2. después se EMITE a todos los que observan
+}</pre>
+</div>
+<ul>
+  <li><strong>Cuándo se emite:</strong> después de cada escritura exitosa. Si la escritura falla, no se emite nada: lo que se ve sigue siendo lo que hay en disco.</li>
+  <li><code>onStart { }</code> lee el archivo la primera vez que alguien observa. Si falla, el Flow termina con la excepción y el ViewModel muestra el error.</li>
+  <li><code>filterNotNull()</code> no deja pasar el <code>null</code> inicial.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Un ViewModel por pantalla</h3>
+<pre>class ListaNotasViewModel(repositorio: NotaRepository) : ViewModel() {
+    init {
+        viewModelScope.launch {
+            repositorio.observarTodas().collect { notas -&gt;            // se queda escuchando
+                _uiState.update { it.copy(carga = EstadoCarga.Listo, notas = notas) }
+            }
+        }
+    }
+    fun onEliminar(id: String) { viewModelScope.launch { repositorio.eliminar(id) } }  // no recarga: el Flow emite
+}
+
+class DetalleNotaViewModel(repositorio: NotaRepository, savedStateHandle: SavedStateHandle) : ViewModel() {
+    private val id: String? = savedStateHandle.get&lt;String&gt;("id")?.takeIf { it != "nueva" }
+    init { /* si hay id: repositorio.obtener(id) y lo copia al formulario */ }
+    fun onGuardar() { /* valida, repositorio.guardar(...), guardadoOk = true */ }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>collect</code></strong>: suscripción. El bloque se ejecuta con cada emisión: al volver del detalle, la lista ya tiene lo guardado.</li>
+  <li><strong><code>SavedStateHandle</code></strong>: trae los argumentos de navegación (<code>"id"</code>). Se obtiene en la fábrica con <code>createSavedStateHandle()</code>.</li>
+  <li>Ambos ViewModels reciben <strong>la misma instancia</strong> de Repository del contenedor (Ej 11): por eso hay una sola fuente de verdad.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 4 · Navegación: se pasa solo el id</h3>
+<pre>NavHost(navController = nav, startDestination = "lista") {
+    composable("lista") {
+        val vm: ListaNotasViewModel = viewModel(factory = ListaNotasViewModel.Factory)
+        PantallaLista(..., onAbrir = { id -&gt; nav.navigate("detalle/$id") },
+                           onNueva = { nav.navigate("detalle/nueva") })
+    }
+    composable("detalle/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) {
+        val vm: DetalleNotaViewModel = viewModel(factory = DetalleNotaViewModel.Factory)
+        PantallaDetalle(..., onVolver = { nav.popBackStack() })
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong>Ruta con argumento</strong>: <code>"detalle/{id}"</code>; <code>"nueva"</code> es un id especial para crear.</li>
+  <li><strong>Solo el id, no el objeto <code>Nota</code></strong>: los argumentos de navegación se guardan en el estado de la Activity (tienen límite de tamaño), y un
+  objeto copiado quedaría desactualizado. Con el id, el detalle le pide la versión vigente al Repository.</li>
+  <li><code>viewModel(factory = ...)</code> dentro de <code>composable { }</code> asocia el ViewModel a <strong>esa entrada</strong> de navegación: se destruye al salir de ella.</li>
+  <li><code>popBackStack()</code> = volver a la pantalla anterior.</li>
+</ul>
+<div class="caja ojo">
+  <strong class="titulo">Dependencias agregadas (justificadas)</strong>
+  <code>navigation-compose 2.9.0</code> (navegación entre destinos con argumentos y pila de pantallas) y <code>lifecycle-viewmodel-compose 2.10.0</code>
+  (la función <code>viewModel()</code> en Compose; misma versión de lifecycle del proyecto). Sin ellas habría que reimplementar a mano la pila de pantallas,
+  el botón atrás y el alcance de cada ViewModel.
+</div>
+
+<div class="bloque">
+<h3>Paso 5 · Desafío: volver con cambios sin guardar</h3>
+<pre>var preguntarDescartar by rememberSaveable { mutableStateOf(false) }      // estado VISUAL local
+BackHandler(enabled = estado.hayCambiosSinGuardar) { preguntarDescartar = true }
+LaunchedEffect(estado.guardadoOk) { if (estado.guardadoOk) onVolver() }    // guardó → volver
+
+if (preguntarDescartar) AlertDialog(
+    title = { Text("¿Descartar cambios?") },
+    confirmButton = { TextButton({ preguntarDescartar = false; onVolver() }) { Text("Descartar") } },
+    dismissButton = { TextButton({ preguntarDescartar = false }) { Text("Seguir editando") } })</pre>
+</div>
+<ul>
+  <li><strong>Decisión:</strong> si hay cambios, preguntar “¿Descartar cambios?” con dos opciones claras (Descartar / Seguir editando). Si no hay cambios, volver directo
+  (preguntar siempre molesta). El botón “← Volver” de la barra hace lo mismo que el atrás del sistema.</li>
+  <li><strong><code>BackHandler</code></strong> intercepta el botón atrás del sistema solo cuando <code>enabled</code> es verdadero.</li>
+  <li><strong>Si el diálogo está abierto</strong> es estado visual de esta pantalla, no del negocio: vive en la UI con <code>rememberSaveable</code> (sobrevive a la rotación).</li>
+  <li><strong><code>LaunchedEffect</code></strong> ejecuta un efecto (navegar) cuando cambia <code>guardadoOk</code>: el ViewModel no navega, solo informa que terminó.</li>
+</ul>
+
+<div class="figs">
+  <figure><img src="img/ej12_dialogo.png" style="height:250px"><br>Atrás con cambios sin guardar</figure>
+  <figure><img src="img/ej12_lista.png" style="height:250px"><br>Lista actualizada al volver<br>(edición + nota nueva)</figure>
+</div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:46%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Abrir “Compras”, agregar “ cocido”</td><td>Aparece “● Cambios sin guardar” ✅</td></tr>
+  <tr><td>Botón atrás del sistema</td><td>Diálogo “¿Descartar cambios?” ✅ → “Seguir editando” conserva el texto ✅</td></tr>
+  <tr><td>Guardar</td><td>Vuelve a la lista, que ya muestra “...y mate cocido” ✅</td></tr>
+  <tr><td>“+” → nota “Tercera” → Guardar</td><td>“3 notas” en la lista ✅</td></tr>
+  <tr><td><code>force-stop</code> y reabrir</td><td>“3 notas” (persistido en <code>notas.json</code>) ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué ocurre si las dos pantallas guardan una copia distinta de la lista?</strong><br>
+Se contradicen: la lista muestra datos viejos después de editar, o una pantalla guarda sobre una versión desactualizada y <em>pisa</em> lo que guardó la otra.
+Por eso ninguna pantalla es dueña de la lista: ambas leen del Repository (una instancia, un <code>StateFlow</code>), que emite cada cambio.</p>
+<p><strong>2. ¿Qué dato tiene sentido recordar sólo en la navegación?</strong><br>
+El <strong>identificador</strong> de la nota que se está viendo (<code>detalle/{id}</code>): es lo mínimo para saber “qué pantalla y sobre qué nota”, y es lo que
+Android restaura si recrea la pila. También qué pantalla está abierta (la pila). El contenido de la nota no: vive en el Repository.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Una fuente de verdad: el Repository emite (<code>Flow</code>) después de cada escritura exitosa.</li>
+    <li>Un ViewModel por pantalla, ambos con la misma instancia de Repository.</li>
+    <li>Navegación con <code>detalle/{id}</code>: solo el id; el detalle pide la nota vigente.</li>
+    <li>Atrás con cambios → “¿Descartar cambios?”; el estado del diálogo es visual y local.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 13 — Probar el ViewModel sin Android ni archivos</h2>
+<p><strong>Consigna:</strong> construir un Repository falso para pruebas, con datos prefijados y posibilidad de provocar una falla. Escribir pruebas del ViewModel
+para carga inicial, validación, guardado correcto y error de escritura. Si hacen falta controladores de corrutinas de prueba, incorporarlos justificando su función.
+<strong>Desafío:</strong> verificar que una solicitud inválida nunca invoca guardar.
+<br>Rama: <code>ej13-tests</code> · Archivos (en <code>app/src/test/</code>): <code>FakeNotaRepository.kt</code>, <code>MainDispatcherRule.kt</code>, <code>NotasViewModelTest.kt</code></p>
+
+<h3>Paso 0 · ¿Por qué ahora se puede?</h3>
+<p>Todo lo hecho desde el Ej 6 lo permite: los ViewModels reciben el <strong>contrato</strong> por constructor (Ej 6/11), no tocan Context ni archivos (Ej 7/11)
+y exponen su estado como <code>StateFlow</code> (Ej 4). Entonces un test puede crear el ViewModel con un Repository falso, llamar a sus eventos y leer
+<code>uiState.value</code>. <strong>Sin emulador y en milisegundos.</strong></p>
+
+<div class="caja clave">
+  <strong class="titulo">Test unitario (JUnit) — PREPARAR → ACTUAR → VERIFICAR</strong>
+  Un método con <code>@Test</code> que arma una situación, ejecuta una acción y comprueba el resultado con <code>assertEquals</code>, <code>assertTrue</code>, etc.
+  Los de <code>src/test</code> corren en la JVM de la computadora (no en el teléfono).
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · El Repository falso</h3>
+<pre>class FakeNotaRepository(notasIniciales: List&lt;Nota&gt; = emptyList()) : NotaRepository {
+    private val notas = MutableStateFlow(notasIniciales)        // datos prefijados
+    var fallarLectura = false                                   // interruptores de falla
+    var fallarEscritura = false
+    val guardadas = mutableListOf&lt;Nota&gt;()                       // registro de llamadas
+
+    override suspend fun guardar(nota: Nota) {
+        if (fallarEscritura) throw IOException("Escritura falsa fallida")
+        guardadas += nota
+        notas.value = notas.value.filterNot { it.id == nota.id } + nota
+    }
+    ...
+}</pre>
+</div>
+<p>Implementa el <strong>mismo contrato</strong> que la app. Tres poderes: datos fijos, fallas a pedido y <strong>registro de llamadas</strong> (<code>guardadas</code>), que
+permite verificar no solo el estado sino <em>qué le pidió</em> el ViewModel al Repository. A esto se le llama <em>fake</em> (doble de prueba).</p>
+
+<div class="bloque">
+<h3>Paso 2 · Controlador de corrutinas de prueba (justificación)</h3>
+<pre>class MainDispatcherRule(
+    private val dispatcher: TestDispatcher = UnconfinedTestDispatcher()
+) : TestWatcher() {
+    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
+    override fun finished(description: Description) = Dispatchers.resetMain()
+}
+
+class NotasViewModelTest {
+    @get:Rule val mainDispatcherRule = MainDispatcherRule()
+    @Test fun ...() = runTest { ... }
+}</pre>
+</div>
+<ul>
+  <li><strong>Por qué hace falta:</strong> <code>viewModelScope</code> lanza sus corrutinas en <code>Dispatchers.Main</code>, el hilo de la interfaz de <em>Android</em>. En la JVM
+  ese hilo no existe y el test falla (“Main dispatcher is missing”). La regla lo reemplaza antes de cada test y lo restaura después.</li>
+  <li><strong><code>UnconfinedTestDispatcher</code></strong> ejecuta las corrutinas en el momento: cuando <code>vm.onGuardar()</code> vuelve, el guardado (falso, sin demoras)
+  ya terminó y se puede verificar.</li>
+  <li><strong><code>runTest { }</code></strong> ejecuta el test dentro de una corrutina de prueba (salta los <code>delay</code>).</li>
+  <li><strong>Dependencia agregada:</strong> <code>kotlinx-coroutines-test 1.9.0</code>, solo para tests (<code>testImplementation</code>), misma versión de corrutinas que ya usa el proyecto.</li>
+  <li><strong><code>unitTests.isReturnDefaultValues = true</code></strong> en Gradle: los ViewModels llaman a <code>android.util.Log</code> al registrar errores; en la JVM esa clase
+  es un “esqueleto” que lanza excepción. Con esta opción devuelve un valor por defecto y el test sigue.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Ejemplos de tests</h3>
+<pre>@Test
+fun detalle_solicitudInvalida_nuncaInvocaGuardar() = runTest {      // DESAFÍO
+    val repo = FakeNotaRepository()                                   // PREPARAR
+    val vm = DetalleNotaViewModel(repo, SavedStateHandle(mapOf("id" to "nueva")))
+    vm.onTituloChange("")
+    vm.onContenidoChange("corto")
+
+    vm.onGuardar(); vm.onGuardar()                                    // ACTUAR (aunque se insista)
+
+    assertTrue(repo.guardadas.isEmpty())                              // VERIFICAR
+    assertFalse(vm.uiState.value.guardadoOk)
+}
+
+@Test
+fun detalle_siFallaLaEscritura_muestraErrorYConservaLoEscrito() = runTest {
+    val repo = FakeNotaRepository().apply { fallarEscritura = true }
+    val vm = detalle(repo)
+    vm.onTituloChange("Parcial"); vm.onContenidoChange("Contenido de prueba")
+    vm.onGuardar()
+    assertNotNull(vm.uiState.value.errorOperacion)
+    assertFalse(vm.uiState.value.guardadoOk)           // no navega como si hubiera guardado
+    assertEquals("Parcial", vm.uiState.value.titulo)   // el usuario no pierde lo escrito
+}</pre>
+</div>
+<p><code>SavedStateHandle(mapOf("id" to "nueva"))</code> simula el argumento de navegación: es una clase común, se crea a mano en el test.
+<code>.apply { fallarEscritura = true }</code> configura el objeto recién creado.</p>
+
+<h3>Resultado: 14 pruebas repetibles</h3>
+<table>
+  <tr><th style="width:52%">Test (<code>NotasViewModelTest</code>)</th><th>Área</th><th>Resultado</th></tr>
+  <tr><td><code>lista_cargaInicial_muestraLasNotasDelRepository</code></td><td>Carga inicial</td><td>✅</td></tr>
+  <tr><td><code>lista_siLaLecturaFalla_muestraErrorYNoSeCierra</code></td><td>Carga inicial (error)</td><td>✅</td></tr>
+  <tr><td><code>detalle_conId_cargaLaNotaEnElFormulario</code></td><td>Carga inicial</td><td>✅</td></tr>
+  <tr><td><code>detalle_tituloVacio_muestraErrorDelCampo</code></td><td>Validación</td><td>✅</td></tr>
+  <tr><td><code>detalle_solicitudInvalida_nuncaInvocaGuardar</code></td><td>Validación (desafío)</td><td>✅</td></tr>
+  <tr><td><code>detalle_notaValida_seGuardaYAvisaQueTermino</code></td><td>Guardado correcto</td><td>✅</td></tr>
+  <tr><td><code>guardarEnElDetalle_actualizaLaLista_unaSolaFuenteDeVerdad</code></td><td>Guardado (Ej 12)</td><td>✅</td></tr>
+  <tr><td><code>detalle_siFallaLaEscritura_muestraErrorYConservaLoEscrito</code></td><td>Error de escritura</td><td>✅</td></tr>
+  <tr><td><code>lista_siFallaEliminar_muestraErrorYConservaLaNota</code></td><td>Error de escritura</td><td>✅</td></tr>
+  <tr><td>+ 5 de <code>ValidadorNotaTest</code> (Ej 5)</td><td>Reglas</td><td>✅</td></tr>
+</table>
+<div class="caja ojo">
+  <strong class="titulo">¿Los tests detectan errores de verdad? (prueba de mutación)</strong>
+  Se desactivó a propósito la validación en <code>DetalleNotaViewModel</code> (<code>if (false &amp;&amp; errores.hayErrores)</code>) y se corrieron los tests:
+  <strong>14 ejecutados, 2 fallaron</strong> (<code>tituloVacio</code> y <code>nuncaInvocaGuardar</code>). Se restauró el código y vuelven a pasar los 14.
+  Un test que nunca puede fallar no prueba nada.
+</div>
+<p>Ejecutar: click derecho sobre <code>NotasViewModelTest</code> → <em>Run</em>, o <code>./gradlew :app:testDebugUnitTest</code> (reporte en
+<code>app/build/reports/tests/testDebugUnitTest/index.html</code>). Ninguno abre la pantalla.</p>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué prueba quedaría innecesariamente difícil si el ViewModel creara su propio Repository?</strong><br>
+<strong>Todas</strong>, y en especial las de error: para probar “si falla la escritura, se muestra un error” habría que hacer fallar un archivo real (llenar el disco,
+cambiar permisos) y correr en un emulador. Con el Repository inyectado alcanza con <code>fallarEscritura = true</code>. Lo mismo para verificar que “nunca se invoca
+guardar”: sin un fake que registre las llamadas, habría que revisar el archivo.</p>
+<p><strong>2. ¿Qué sí habría que probar en una prueba de integración con archivo real?</strong><br>
+Lo que el fake no cubre: que <code>ArchivoNotasRepository</code> escribe y vuelve a leer el JSON correctamente (tildes, saltos de línea, comillas, <code>;</code>), que un
+archivo truncado produce <code>FormatoInvalidoException</code>, que la escritura con temporal + renombrado no deja el archivo a medias, y que los datos sobreviven a
+reiniciar la app. Eso va en <code>src/androidTest</code> (en el dispositivo) o con una carpeta temporal (<code>TemporaryFolder</code> de JUnit).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Fake del contrato: datos fijos, fallas a pedido, registro de llamadas.</li>
+    <li><code>MainDispatcherRule</code> + <code>runTest</code>: reemplazan el hilo principal de Android en la JVM.</li>
+    <li>Tests de carga, validación, guardado y error; ninguno abre la pantalla.</li>
+    <li>Prueba de mutación: romper el código a propósito confirma que los tests fallan.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 14 — Room y archivo no son lo mismo</h2>
+<p><strong>Consigna:</strong> crear un adaptador del contrato de notas que utilice un DAO de Room. Compararlo con el Repository de archivo: qué consultas son fáciles,
+qué errores aparecen, cómo se actualiza la UI y qué datos no conviene poner en un txt. Mantener un archivo de texto para preferencias o un borrador exportable,
+sin duplicar toda la base. <strong>Desafío:</strong> tabla con tres decisiones de almacenamiento justificadas.
+<br>Rama: <code>ej14-room</code> · Archivos nuevos: <code>RoomNotaRepository.kt</code> (Entity, DAO, Database, adaptador), <code>ExportadorNotas.kt</code></p>
+
+<div class="caja clave">
+  <strong class="titulo">Room</strong>
+  Biblioteca oficial sobre <strong>SQLite</strong> (la base de datos que trae Android). Se declaran tablas (<code>@Entity</code>), consultas (<code>@Dao</code> con SQL) y la base
+  (<code>@Database</code>); <strong>KSP</strong> genera en compilación el código que las implementa y <em>verifica el SQL</em>: una consulta mal escrita no compila.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · Entity, DAO y Database</h3>
+<pre>@Entity(tableName = "notas")
+data class NotaEntity(
+    @PrimaryKey val id: String,
+    val titulo: String,
+    val contenido: String,
+    val actualizadaEn: Long                 // columna técnica: la pantalla no la necesita
+)
+
+@Dao
+interface NotaDao {
+    @Query("SELECT * FROM notas ORDER BY actualizadaEn DESC")
+    fun observarTodas(): Flow&lt;List&lt;NotaEntity&gt;&gt;     // Room emite cuando la tabla cambia
+    @Query("SELECT * FROM notas WHERE id = :id")
+    suspend fun obtener(id: String): NotaEntity?
+    @Upsert suspend fun guardar(nota: NotaEntity)      // INSERT o UPDATE según la clave
+    @Query("DELETE FROM notas WHERE id = :id")
+    suspend fun eliminar(id: String)
+    @Query("SELECT * FROM notas WHERE titulo LIKE '%' || :texto || '%' ORDER BY titulo")
+    fun buscarPorTitulo(texto: String): Flow&lt;List&lt;NotaEntity&gt;&gt;
+}
+
+@Database(entities = [NotaEntity::class], version = 1, exportSchema = false)
+abstract class AppDatabase : RoomDatabase() { abstract fun notaDao(): NotaDao }</pre>
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · El adaptador: el contrato de siempre, con el DAO adentro</h3>
+<pre>class RoomNotaRepository(private val dao: NotaDao, ...) : NotaRepository {
+    override fun observarTodas() = dao.observarTodas().map { filas -&gt; filas.map { it.aDominio() } }
+                                                      .catch { e -&gt; throw traducir(e) }
+    override suspend fun guardar(nota: Nota) = conErrores { dao.guardar(nota.aEntity(reloj())) }
+    ...
+}
+fun NotaEntity.aDominio() = Nota(id, titulo, contenido)                 // Entity → dominio
+fun Nota.aEntity(actualizadaEn: Long) = NotaEntity(id, titulo, contenido, actualizadaEn)</pre>
+</div>
+<ul>
+  <li><strong>Mismo contrato <code>NotaRepository</code></strong> que el archivo (Ej 10–12): <code>ListaNotasViewModel</code>, <code>DetalleNotaViewModel</code> y las pantallas
+  <strong>no cambiaron</strong>. En <code>ContenedorApp</code> se agregó <code>OrigenDatos.ROOM</code> y se eligió con la misma única línea del Ej 11.</li>
+  <li><strong>Funciones de extensión</strong> (<code>fun NotaEntity.aDominio()</code>): agregan una función a una clase existente sin modificarla.</li>
+  <li><strong>Traducción de errores:</strong> Room falla con <code>SQLiteException</code>; el adaptador la convierte en <code>IOException</code>, que es lo que el contrato y los
+  ViewModels ya manejan (Ej 9). Así el ViewModel tampoco conoce SQL en los errores.</li>
+  <li><strong>Una sola instancia de <code>AppDatabase</code></strong> en el contenedor (<code>by lazy</code>, <code>Room.databaseBuilder(app, ..., "notas.db")</code>): abrir la base
+  es costoso y dos instancias sobre el mismo archivo podrían pisarse.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Lo que sí va a un archivo de texto: el resumen exportable</h3>
+<pre>fun interface ExportadorNotas { suspend fun exportar(notas: List&lt;Nota&gt;): String }
+
+class ArchivoExportadorNotas(carpeta: File) : ExportadorNotas {
+    override suspend fun exportar(notas: List&lt;Nota&gt;) = withContext(Dispatchers.IO) {
+        archivo.writeText(/* "MIS NOTAS — exportado el ..." + cada nota */, Charsets.UTF_8)
+        "notas_exportadas.txt"
+    }
+}</pre>
+</div>
+<p>Botón “Exportar .txt” en la lista → <code>ListaNotasViewModel.onExportar()</code>. El <code>.txt</code> se genera <strong>a partir de la base</strong> y nadie lo vuelve a leer para
+cargar notas: no es una segunda fuente de verdad, es una <em>salida</em> legible por personas. <code>fun interface</code> permite reemplazarlo en los tests con una lambda:
+<code>ExportadorNotas { "falso.txt" }</code>.</p>
+
+<div class="figs"><figure><img src="img/ej14_lista.png" style="height:250px"><br>Lista con Room: la nota editada sube primera<br>(ORDER BY actualizadaEn), “Exportar .txt”</figure></div>
+
+<div class="caja ojo">
+  <strong class="titulo">Dependencias agregadas (justificadas)</strong>
+  Plugin <code>com.google.devtools.ksp 2.3.13</code> (genera el código de Room; es la misma versión que ya estaba en la caché de Gradle de otro proyecto) y
+  <code>room-runtime</code>, <code>room-ktx</code>, <code>room-compiler</code> <code>2.8.5</code>. No se tocaron las versiones de AGP, Kotlin ni Compose.
+</div>
+
+<h3>Comparación: archivo JSON vs. Room</h3>
+<table>
+  <tr><th style="width:20%"></th><th>Archivo <code>notas.json</code> (Ej 10–12)</th><th>Room (Ej 14)</th></tr>
+  <tr><td>Consultas fáciles</td><td>Ninguna: para buscar, filtrar u ordenar hay que leer <em>todo</em> el archivo y hacerlo en Kotlin</td>
+      <td>Buscar (<code>LIKE</code>), ordenar (<code>ORDER BY</code>), filtrar (<code>WHERE</code>), contar: una línea de SQL, verificada al compilar</td></tr>
+  <tr><td>Escritura</td><td>Reescribe el archivo entero en cada cambio (con temporal + renombrado para no corromperlo)</td>
+      <td>Modifica solo la fila; transacciones atómicas incluidas</td></tr>
+  <tr><td>Errores que aparecen</td><td><code>IOException</code>, archivo truncado / JSON inválido (<code>FormatoInvalidoException</code>), concurrencia (Mutex a mano)</td>
+      <td><code>SQLiteException</code> (disco lleno, base bloqueada), errores de migración al cambiar el esquema (<code>version</code>); el SQL inválido se detecta al compilar</td></tr>
+  <tr><td>Cómo se actualiza la UI</td><td>El Repository mantiene un <code>StateFlow</code> y emite a mano después de escribir (Ej 12)</td>
+      <td>El DAO devuelve <code>Flow</code> y Room re-emite solo cuando la tabla cambia</td></tr>
+  <tr><td>Legible por una persona</td><td>Sí (se abre con cualquier editor)</td><td>No (archivo binario SQLite)</td></tr>
+</table>
+
+<h3>Desafío: tres decisiones de almacenamiento</h3>
+<table>
+  <tr><th style="width:24%">Dato</th><th style="width:20%">Dónde</th><th>Por qué</th></tr>
+  <tr><td>Las notas (registros con id, título, contenido, fecha)</td><td><strong>Room</strong></td>
+      <td>Son registros estructurados que se buscan, ordenan, editan y borran de a uno; la UI necesita enterarse de cada cambio (Flow) y no pueden corromperse a medias.</td></tr>
+  <tr><td>Resumen para compartir o imprimir</td><td><strong>Archivo .txt</strong> (<code>notas_exportadas.txt</code>)</td>
+      <td>Es texto libre para una persona, se genera a pedido desde la base y no se vuelve a leer: no compite como fuente de verdad.</td></tr>
+  <tr><td>Lo que se está escribiendo en el formulario</td><td><strong>ViewModel</strong> (memoria)</td>
+      <td>Es estado de pantalla: cambia en cada tecla, solo importa mientras se edita y sobrevive a la rotación. Se persiste recién al pulsar Guardar.</td></tr>
+</table>
+<p><strong>¿Qué datos no conviene poner en un txt?</strong> Registros que se consultan o modifican de a uno (habría que reescribir todo), datos relacionados entre sí
+(notas y etiquetas), datos que cambian seguido o desde varios lugares a la vez, y datos sensibles (un txt se lee y edita fácil).</p>
+
+<h3>Pruebas</h3>
+<table>
+  <tr><th style="width:44%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Crear “Parcial DA1” y “Compras” con Room</td><td>“2 notas”; se crea <code>databases/notas.db</code> ✅</td></tr>
+  <tr><td>Editar “Parcial DA1”</td><td>La lista se actualiza sola y la nota sube primera (ORDER BY actualizadaEn DESC) ✅</td></tr>
+  <tr><td>Exportar .txt</td><td>“Exportadas 2 notas a notas_exportadas.txt”; el archivo tiene el resumen legible ✅</td></tr>
+  <tr><td><code>force-stop</code> y reabrir</td><td>“2 notas” desde la base ✅</td></tr>
+  <tr><td>Tests JVM (fake, sin Room)</td><td>14/14: los ViewModels no cambiaron ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Quién transforma Entity en modelo de dominio si son distintos?</strong><br>
+El <strong>adaptador</strong> <code>RoomNotaRepository</code> (capa de datos), con <code>aDominio()</code> y <code>aEntity()</code>. Hacia arriba solo sale <code>Nota</code>: ni el ViewModel ni la
+pantalla conocen <code>NotaEntity</code> ni sus columnas técnicas (<code>actualizadaEn</code>).</p>
+<p><strong>2. ¿Qué gana el ViewModel al no conocer SQL?</strong><br>
+Que no cambia si cambia la base (otra tabla, otra consulta, otra biblioteca, un servidor), que se prueba con un fake sin base de datos (Ej 13) y que su
+código queda en el idioma del problema (“guardar nota”), no en el del almacenamiento (“INSERT INTO...”).</p>
+<p><strong>3. ¿Qué sucede si hay dos fuentes de verdad sin política clara?</strong><br>
+Se desincronizan: una pantalla lee de Room y otra del JSON, se guarda en una y no en la otra, y no hay forma de saber cuál tiene razón (o una sobrescribe a la
+otra al sincronizar). Por eso la política: <strong>Room es la única fuente de verdad de las notas</strong>; el txt es una exportación de solo salida.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Entity (tabla) ≠ Nota (dominio); el adaptador traduce datos y errores.</li>
+    <li>Mismo contrato: ViewModels, pantallas y tests sin cambios.</li>
+    <li>Room: consultas SQL verificadas, escrituras por fila, Flow automático.</li>
+    <li>Archivo de texto solo para lo que es texto: un resumen exportable, no una copia de la base.</li>
+  </ol>
+</div>
+
+<h2 class="salto">Ejercicio 15 — Integrador: Cuaderno de campo</h2>
+<p><strong>Consigna:</strong> app para guardar observaciones breves de una salida, recorrido, visita o actividad. Cada registro tiene identificador, título,
+descripción, fecha y marca de favorito. Lista, pantalla de edición, búsqueda por título y manejo claro de estados vacíos o errores. Registros en Room detrás
+de un contrato Repository; bitácora libre en <code>bitacora.txt</code>; resumen en <code>resumen.txt</code>.
+<br>Rama: <code>ej15-cuaderno-de-campo</code></p>
+
+<h3>Etapa 1 · Dibujo y responsabilidades</h3>
+<div class="bloque">
+<pre style="font-size:6.2pt;white-space:pre">┌──────── LISTA ("lista") ────────┐      ┌──── EDICIÓN ("editar/{id}") ────┐      ┌─ BITÁCORA ("bitacora") ─┐
+│ Cuaderno de campo     [Bitácora]│      │ ← Volver     Nuevo/Editar reg.  │      │ ← Volver     Bitácora   │
+│ [ Buscar por título ........ ]  │      │ [ Título ................ 0/60 ]│      │ ┌─────────────────────┐ │
+│ [Generar resumen] [Compartir ]  │ tap  │ [ Descripción ................ ]│      │ │ texto libre,        │ │
+│ 3 registros                     │ ───► │ Fecha: 05/11/2026     [Cambiar] │      │ │ párrafos y tildes   │ │
+│ ┌ 05/11 Reserva Costanera  ★ ┐  │      │ Favorito ★              [ ●  ]  │      │ └─────────────────────┘ │
+│ │ Garzas blancas... Eliminar │  │ ◄─── │ ● Cambios sin guardar           │      │ [Descartar] [Guardar]   │
+│ └────────────────────────────┘  │ save │ [          Guardar           ]  │      └─────────────────────────┘
+│                            (+)  │      └─────────────────────────────────┘
+└─────────────────────────────────┘</pre>
+</div>
+<div class="bloque">
+<pre>Compose (PantallaLista / PantallaEditar / PantallaBitacora)   ← dibuja y avisa
+   │ eventos ↑                                       estado ↓ (StateFlow)
+ViewModels (ListaRegistrosVM / EditarRegistroVM / BitacoraVM) ← reglas y estados
+   │ contratos
+RegistroRepository ─► RoomRegistroRepository ─► RegistroDao ─► cuaderno.db (Room/SQLite)
+BitacoraRepository ─► ArchivoBitacoraRepository ─────────────► bitacora.txt
+GeneradorResumen   ─► ArchivoResumen ────────────────────────► resumen.txt
+                       (todo armado por ContenedorApp en MvvmLabApp)</pre>
+</div>
+<table>
+  <tr><th style="width:18%">Pantalla</th><th>Estado de pantalla</th><th>Acciones del usuario (eventos)</th></tr>
+  <tr><td>Lista</td><td><code>carga</code> (Cargando/Listo/Error), <code>registros</code>, <code>busqueda</code>, <code>mensaje</code>, <code>error</code>, <code>textoParaCompartir</code></td>
+      <td>buscar, abrir, nuevo (+), favorito ★, eliminar, generar resumen, compartir, ir a bitácora, reintentar</td></tr>
+  <tr><td>Edición</td><td><code>carga</code>, <code>esNuevo</code>, <code>formulario</code> (título, descripción, fecha, favorito), <code>original</code>, <code>errores</code> por campo, <code>guardando</code>, <code>error</code>, <code>guardadoOk</code></td>
+      <td>editar cada campo, elegir fecha, marcar favorito, guardar, volver (con diálogo si hay cambios)</td></tr>
+  <tr><td>Bitácora</td><td><code>carga</code>, <code>texto</code>, <code>textoGuardado</code>, <code>guardando</code>, <code>mensaje</code>, <code>error</code></td>
+      <td>escribir, guardar, descartar, reintentar, volver</td></tr>
+</table>
+
+<h3>Etapa 2 · Registros y Room</h3>
+<div class="bloque">
+<pre>data class Registro(val id: String, val titulo: String, val descripcion: String,
+                    val fecha: Long, val favorito: Boolean)                     // dominio
+
+interface RegistroRepository {
+    fun observar(busqueda: String): Flow&lt;List&lt;Registro&gt;&gt;
+    suspend fun obtener(id: String): Registro?
+    suspend fun guardar(registro: Registro)
+    suspend fun eliminar(id: String)
+    suspend fun cambiarFavorito(id: String, favorito: Boolean)
+}
+
+@Query("""SELECT * FROM registros WHERE titulo LIKE '%' || :busqueda || '%'
+          ORDER BY favorito DESC, fecha DESC, actualizadoEn DESC""")
+fun observar(busqueda: String): Flow&lt;List&lt;RegistroEntity&gt;&gt;</pre>
+</div>
+<ul>
+  <li><strong>Alta, lectura, modificación y baja</strong> por el contrato; el ViewModel observa el <code>Flow</code> (nunca consulta el DAO desde Compose).</li>
+  <li><strong>Búsqueda</strong>: el ViewModel guarda el texto en un <code>MutableStateFlow</code> y usa <code>flatMapLatest</code>: cada vez que cambia la búsqueda deja de
+  observar la consulta anterior y observa la nueva. Room vuelve a emitir cuando la tabla cambia.</li>
+  <li><strong>Fecha</strong> como <code>Long</code> (medianoche UTC, lo que devuelve el <code>DatePicker</code> de Material 3), formateada siempre en UTC para que no “cambie de día”.</li>
+  <li><strong>Reglas</strong> (<code>ValidadorRegistro</code>): título no vacío y ≤ 60 caracteres, descripción no vacía, fecha no futura. Errores por campo.</li>
+</ul>
+
+<h3>Etapa 3 · Archivos de texto</h3>
+<table>
+  <tr><th style="width:18%">Archivo</th><th>Qué guarda</th><th>Cuándo se actualiza / qué pasa si falla</th></tr>
+  <tr><td><code>bitacora.txt</code></td><td>Texto libre del usuario, independiente de los registros. UTF-8, se conservan párrafos y tildes.</td>
+      <td>Al tocar Guardar en la pantalla Bitácora. Escritura con temporal + renombrado; si falla, error en pantalla y el texto sigue en el editor.</td></tr>
+  <tr><td><code>resumen.txt</code></td><td>Texto <em>generado</em> a partir de <strong>todos</strong> los registros (aunque haya búsqueda activa).</td>
+      <td><strong>Solo a pedido</strong> (“Generar resumen” o “Compartir”), no en cada alta. Si falla: mensaje de error, Room no se toca y el resumen anterior
+      queda completo (temporal + renombrado). Nunca se relee: no es fuente de verdad.</td></tr>
+</table>
+<p>Ninguno pide permisos: están en <code>filesDir</code>, la carpeta privada de la app.</p>
+
+<h3>Etapa 4 · Experimentos obligatorios (emulador)</h3>
+<table>
+  <tr><th style="width:36%">Experimento</th><th>Resultado observado</th></tr>
+  <tr><td>Cerrar (<code>force-stop</code>) y reabrir</td><td>“3 registros”, igual que antes de cerrar ✅</td></tr>
+  <tr><td>Rotar el emulador mientras se escribe</td><td>Título y descripción intactos en horizontal y al volver (estado en el ViewModel) ✅</td></tr>
+  <tr><td>Guardar con título vacío</td><td>“El título no puede estar vacío” y “Escribí una descripción” debajo de cada campo; no se guarda ✅</td></tr>
+  <tr><td>Falla controlada (<code>simularFallaEnRegistros = true</code>)</td><td>★ → “No se pudo marcar como favorito”; Guardar → “No se pudo guardar. Tus datos siguen en pantalla.” Sin cierres ✅</td></tr>
+  <tr><td>Editar un registro y regresar</td><td>La lista muestra “Patos y un atardecer dorado” al volver (Flow de Room) ✅</td></tr>
+  <tr><td>Verificar archivos y base</td><td><code>run-as ... ls</code>: <code>databases/cuaderno.db</code>, <code>files/bitacora.txt</code>, <code>files/resumen.txt</code>; contenido revisado con <code>cat</code> ✅</td></tr>
+</table>
+
+<div class="figs">
+  <figure><img src="img/ej15_lista.png" style="height:230px"><br>Lista (favorito arriba)</figure>
+  <figure><img src="img/ej15_titulo_vacio.png" style="height:230px"><br>Título vacío</figure>
+  <figure><img src="img/ej15_falla.png" style="height:230px"><br>Falla controlada</figure>
+  <figure><img src="img/ej15_bitacora.png" style="height:230px"><br>Bitácora (párrafos, tildes)</figure>
+</div>
+<div class="figs">
+  <figure><img src="img/ej15_rotado.png" style="width:300px"><br>Rotado mientras se escribe</figure>
+  <figure><img src="img/ej15_sin_resultados.png" style="height:200px"><br>Búsqueda sin resultados</figure>
+  <figure><img src="img/ej15_compartir.png" style="height:200px"><br>Compartir (Intent)</figure>
+</div>
+
+<h3>Etapa 5 · Entrega</h3>
+<p><strong>Las dos persistencias:</strong> los <strong>registros</strong> (estructurados, se buscan, ordenan, editan de a uno y la UI debe enterarse de cada cambio) van a
+<strong>Room</strong>, que es su única fuente de verdad. Los <strong>archivos de texto</strong> guardan lo que es texto para personas: la bitácora libre (que el usuario
+escribe y relee) y el resumen (que se genera desde Room y solo se lee o comparte).</p>
+<table>
+  <tr><th style="width:4%">#</th><th style="width:40%">Prueba</th><th>Resultado observado</th></tr>
+  <tr><td>1</td><td>Alta de 3 registros (uno favorito) → cerrar y reabrir</td><td>Persisten; el favorito aparece primero ✅</td></tr>
+  <tr><td>2</td><td>Buscar “feria” y luego “feriax”</td><td>1 resultado; luego “Ningún registro coincide con “feriax”.” ✅</td></tr>
+  <tr><td>3</td><td>Bitácora con “Sábado… / Domingo: llovió; … ñandú.” + nuevo párrafo → Guardar</td><td><code>bitacora.txt</code> con los 3 párrafos, tildes y ñ ✅</td></tr>
+  <tr><td>4</td><td>Generar resumen con búsqueda activa / Compartir</td><td><code>resumen.txt</code> con los 3 registros (★ / •); se abre el selector de Android ✅</td></tr>
+  <tr><td>5</td><td>Tests JVM (<code>CuadernoTest</code>)</td><td>11/11: validador, búsqueda, favorito, error de lectura, resumen, “título vacío nunca guarda”, error de escritura ✅</td></tr>
+</table>
+<div class="caja clave">
+  <strong class="titulo">Desafío opcional: compartir el resumen con un Intent</strong>
+  <code>Intent(Intent.ACTION_SEND)</code> con <code>type = "text/plain"</code> y <code>EXTRA_TEXT</code> = <strong>el contenido</strong> del resumen, dentro de
+  <code>Intent.createChooser(...)</code>. No se comparte la ruta interna (<code>/data/data/...</code>), que otra app no podría abrir y expondría la estructura privada.
+  El ViewModel solo prepara el texto (<code>textoParaCompartir</code>); la vista lo lanza con el <code>Context</code> (API del Android SDK) y avisa
+  <code>onCompartido()</code> para que no se repita.
+</div>
+<div class="caja ojo">
+  <strong class="titulo">Una decisión que cambiaría si el proyecto creciera</strong>
+  La búsqueda usa <code>LIKE '%texto%'</code>, que recorre toda la tabla y no distingue tildes (“rio” no encuentra “río”). Con miles de registros pasaría a
+  <strong>FTS (Full-Text Search) de Room</strong> con una columna normalizada sin tildes. También reemplazaría el contenedor manual por <strong>Hilt</strong> si
+  aparecieran muchas dependencias, y agregaría <strong>migraciones</strong> de Room (<code>version = 2</code>) en vez de recrear la base al cambiar la tabla.
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Cuál es la fuente de verdad de los registros?</strong><br>
+La tabla <code>registros</code> de Room (<code>cuaderno.db</code>), a través de <code>RegistroRepository</code>. Las pantallas observan su <code>Flow</code>; el resumen se genera
+desde ella y nunca al revés.</p>
+<p><strong>2. ¿La bitácora libre y el resumen cumplen el mismo papel?</strong><br>
+No. La <strong>bitácora</strong> es un <em>dato original</em> del usuario: él la escribe, se relee y es su propia fuente de verdad (si se pierde, se pierde información).
+El <strong>resumen</strong> es un <em>dato derivado</em>: se puede regenerar en cualquier momento desde Room; si se borra no se pierde nada.</p>
+<p><strong>3. ¿Qué sobreviviría a la eliminación del proceso y qué no?</strong><br>
+Sobreviven: los registros (Room), <code>bitacora.txt</code> y <code>resumen.txt</code> (disco). No sobreviven: lo escrito y no guardado en el formulario o la bitácora, el
+texto de búsqueda, los mensajes y el estado de los diálogos (viven en ViewModels y en la UI, en memoria).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Qué código corresponde a cada capa (criterio de finalización)</strong>
+  <table style="margin:6px 0 0;background:#fff">
+    <tr><th>Capa</th><th>Archivos</th></tr>
+    <tr><td>View (Compose)</td><td><code>PantallaLista.kt</code>, <code>PantallaEditar.kt</code>, <code>PantallaBitacora.kt</code>, <code>NavegacionApp.kt</code></td></tr>
+    <tr><td>ViewModel</td><td><code>ViewModels.kt</code> (Lista, Editar, Bitácora) + <code>ValidadorRegistro.kt</code></td></tr>
+    <tr><td>Repository (contratos)</td><td><code>Modelo.kt</code></td></tr>
+    <tr><td>Room</td><td><code>RegistroRoom.kt</code> (Entity, DAO, Database, adaptador)</td></tr>
+    <tr><td>Archivos</td><td><code>ArchivosCuaderno.kt</code> (bitácora, resumen, falla controlada)</td></tr>
+    <tr><td>Dependencias</td><td><code>ContenedorApp.kt</code> (contenedor + <code>Application</code>)</td></tr>
+    <tr><td>API de Android</td><td><code>Intent.ACTION_SEND</code> en <code>PantallaLista</code>; <code>filesDir</code> y <code>Room.databaseBuilder</code> en el contenedor</td></tr>
+  </table>
+</div>
+
+</body>
+</html>
