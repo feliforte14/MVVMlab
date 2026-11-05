@@ -1,4 +1,4 @@
-# MvvmLab
+# 📓 MvvmLab
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3. Una app que va creciendo ejercicio a ejercicio, separando responsabilidades
@@ -7,13 +7,13 @@ con **MVVM**, un **Repository** que lee y escribe archivos de texto, **Room**, y
 📄 **Apuntes completos** (teoría, resolución paso a paso, pruebas y capturas de los 15 ejercicios):
 [`apuntes/Apuntes_MVVM.pdf`](apuntes/Apuntes_MVVM.pdf)
 
-## Cómo está organizado
+## 🧭 Cómo está organizado
 
 - **`main`**: proyecto base (plantilla *Empty Activity* de Compose, con el tema en `core/theme/`) + apuntes completos.
 - **Una rama por ejercicio**, cada una con **solo el código de su ejercicio** y su propio `README.md`.
   Cada rama sale de la anterior, así que la app evoluciona de una a la siguiente.
 
-## Estructura de carpetas
+## 🏛️ Estructura de carpetas
 
 El código se organiza **por capas**, igual que
 [PokedexAcademy-MVVM-Clean](https://github.com/ExBattou/PokedexAcademy-MVVM-Clean). Cada carpeta es un paquete de Kotlin
@@ -49,7 +49,7 @@ app/src/test/java/com/example/mvvmlab/
 > A diferencia del repo de referencia, no hay `domain/usecase/`: la guía pide no crear capas "porque sí" y en estos
 > ejercicios cada caso de uso solo delegaría en el Repository.
 
-## Ramas
+## 🌿 Ramas
 
 | Rama | Ejercicio | Tema principal |
 |---|---|---|
@@ -69,7 +69,7 @@ app/src/test/java/com/example/mvvmlab/
 | [`ej14-room`](../../tree/ej14-room) | 14 — Room y archivo no son lo mismo | Entity/DAO/Database, adaptador, archivo vs. Room |
 | [`ej15-cuaderno-de-campo`](../../tree/ej15-cuaderno-de-campo) | 15 — Integrador: Cuaderno de campo | Room + bitácora.txt + resumen.txt + Intent, 11 tests |
 
-## Dependencias agregadas durante la práctica
+## 📦 Dependencias agregadas durante la práctica
 
 Todas justificadas en los apuntes; no se actualizaron AGP, Kotlin ni Compose.
 
@@ -79,3 +79,15 @@ Todas justificadas en los apuntes; no se actualizaron AGP, Kotlin ni Compose.
 | 12 | `navigation-compose 2.9.0`, `lifecycle-viewmodel-compose 2.10.0` | Navegar entre pantallas; `viewModel()` por destino |
 | 13 | `kotlinx-coroutines-test 1.9.0` (solo tests) | `runTest`, `Dispatchers.setMain` |
 | 14 | Plugin KSP `2.3.13`, Room `2.8.5` | Base de datos con DAO |
+
+## 🚀 Cómo ejecutar
+
+```bash
+git clone https://github.com/feliforte14/MVVMlab.git
+cd MVVMlab
+git checkout ej15-cuaderno-de-campo     # o la rama del ejercicio que quieras ver
+```
+
+1. Abrir la carpeta en **Android Studio** y esperar la sincronización de Gradle.
+2. Ejecutar **Run ▶** en un emulador o dispositivo (minSdk 24).
+3. Tests (ramas 5 en adelante): `./gradlew :app:testDebugUnitTest`.
