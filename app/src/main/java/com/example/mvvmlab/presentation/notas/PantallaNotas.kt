@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.notas
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,11 +19,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.domain.model.Nota
 
 @Composable
 fun PantallaNotas(
@@ -177,4 +181,20 @@ fun PantallaNotasPreview() {
             {}, {}, {}, {}, {}, {}, {}
         )
     }
+}
+
+@Composable
+fun PantallaNotasConViewModel(viewModel: NotasViewModel, modifier: Modifier = Modifier) {
+    val estado by viewModel.uiState.collectAsStateWithLifecycle()
+    PantallaNotas(
+        estado = estado,
+        onTituloChange = viewModel::onTituloChange,
+        onContenidoChange = viewModel::onContenidoChange,
+        onGuardar = viewModel::onGuardar,
+        onCancelarEdicion = viewModel::onCancelarEdicion,
+        onEditar = viewModel::onEditar,
+        onEliminar = viewModel::onEliminar,
+        onReintentar = viewModel::onReintentar,
+        modifier = modifier
+    )
 }

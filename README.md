@@ -25,6 +25,42 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── model/
+ │   │   ├── EstadoCarga.kt
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── ArchivoNotasRepository.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ │   ├── repository/
+ │   │   ├── NotaRepository.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorNota.kt
+ ├── presentation/
+ │   ├── notas/
+ │   │   ├── NotasUiState.kt
+ │   │   ├── NotasViewModel.kt
+ │   │   ├── PantallaNotas.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/
+ │   ├── validacion/
+ │   │   ├── ValidadorNotaTest.kt
+```
+
 ## Consigna
 
 Extender a varias notas. Elegir un formato de texto claro y documentado (no `split(";")` si el usuario puede escribir
@@ -35,10 +71,10 @@ punto y coma). Lectura, alta, edición y borrado a través del Repository.
 
 | Archivo | Capa | Contenido |
 |---|---|---|
-| `NotaRepository.kt` | Datos | `Nota`, contrato `NotaRepository` (el del Ej 6), `FormatoInvalidoException`, `ArchivoNotasRepository` (JSON + `Mutex` + temporal) |
-| `NotasViewModel.kt` | ViewModel | `NotasUiState` (carga, notas, formulario con `editandoId`), alta/edición/borrado, `Factory` |
-| `PantallaNotas.kt` | View | Formulario (nueva / editando) + lista con Editar / Eliminar + estados de carga y error |
-| `ValidadorNota.kt` (+ test) | Reglas | Vuelve del Ej 5 |
+| `domain/repository/NotaRepository.kt` | Datos | `Nota`, contrato `NotaRepository` (el del Ej 6), `FormatoInvalidoException`, `ArchivoNotasRepository` (JSON + `Mutex` + temporal) |
+| `presentation/notas/NotasViewModel.kt` | ViewModel | `NotasUiState` (carga, notas, formulario con `editandoId`), alta/edición/borrado, `Factory` |
+| `presentation/notas/PantallaNotas.kt` | View | Formulario (nueva / editando) + lista con Editar / Eliminar + estados de carga y error |
+| `domain/validacion/ValidadorNota.kt` (+ test) | Reglas | Vuelve del Ej 5 |
 
 ## Formato documentado: `notas.json`
 
