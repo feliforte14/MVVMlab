@@ -38,7 +38,8 @@ fun AppNotas() {
                 onAbrir = { id -> nav.navigate("detalle/$id") },
                 onNueva = { nav.navigate("detalle/${DetalleNotaViewModel.ID_NUEVA}") },
                 onEliminar = vm::onEliminar,
-                onReintentar = vm::onReintentar
+                onReintentar = vm::onReintentar,
+                onExportar = vm::onExportar
             )
         }
 

@@ -1,6 +1,7 @@
 package com.example.mvvmlab
 
 import android.app.Application
+import androidx.room.Room
 
 // =====================================================================
 // EJERCICIO 11 — Dependencias: ¿quien crea el Repository?
@@ -18,7 +19,7 @@ import android.app.Application
 // =====================================================================
 
 // Origenes de datos posibles.
-enum class OrigenDatos { MEMORIA, ARCHIVO }
+enum class OrigenDatos { MEMORIA, ARCHIVO, ROOM }
 
 class ContenedorApp(private val app: Application) {
 
@@ -27,7 +28,7 @@ class ContenedorApp(private val app: Application) {
     // alterna entre el Repository en memoria y el de archivos.
     // Ningun ViewModel ni composable se entera.
     // ---------------------------------------------------------------
-    val origenDatos: OrigenDatos = OrigenDatos.ARCHIVO
+    val origenDatos: OrigenDatos = OrigenDatos.ROOM
 
     // by lazy: se crea la primera vez que alguien lo pide, y despues se
     // devuelve SIEMPRE la misma instancia (no en cada recomposicion, no
@@ -36,8 +37,18 @@ class ContenedorApp(private val app: Application) {
         when (origenDatos) {
             OrigenDatos.MEMORIA -> NotaRepositoryEnMemoria()
             OrigenDatos.ARCHIVO -> ArchivoNotasRepository(app.filesDir)
+            OrigenDatos.ROOM -> RoomNotaRepository(baseDeDatos.notaDao())
         }
     }
+
+    // Ej 14: UNA instancia de la base para toda la app (abrirla es costoso
+    // y dos instancias sobre el mismo archivo podrian pisarse).
+    private val baseDeDatos: AppDatabase by lazy {
+        Room.databaseBuilder(app, AppDatabase::class.java, "notas.db").build()
+    }
+
+    // Ej 14: el archivo de texto queda para el resumen exportable.
+    val exportadorNotas: ExportadorNotas by lazy { ArchivoExportadorNotas(app.filesDir) }
 }
 
 // Application propia: Android la crea ANTES que cualquier Activity y la

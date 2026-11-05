@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    // Ej 14: KSP genera el codigo de Room (DAO, base) en tiempo de compilacion
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -55,6 +57,10 @@ dependencies {
     // Ej 12: navegacion entre dos pantallas y viewModel() por destino
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // Ej 14: Room (base de datos SQLite con DAO)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     // Ej 13: controlar corrutinas en tests (runTest, Dispatchers.setMain)
     testImplementation(libs.kotlinx.coroutines.test)

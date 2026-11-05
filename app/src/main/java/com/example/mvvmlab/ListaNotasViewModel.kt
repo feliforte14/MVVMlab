@@ -24,13 +24,15 @@ sealed interface EstadoCarga {
 data class ListaUiState(
     val carga: EstadoCarga = EstadoCarga.Cargando,
     val notas: List<Nota> = emptyList(),
-    val errorOperacion: String? = null
+    val errorOperacion: String? = null,
+    val mensaje: String? = null              // Ej 14: resultado de exportar
 )
 
 // ViewModel de la pantalla LISTA. No guarda su propia copia "de verdad":
 // OBSERVA el Flow del Repository y publica lo que llega.
 class ListaNotasViewModel(
-    private val repositorio: NotaRepository
+    private val repositorio: NotaRepository,
+    private val exportador: ExportadorNotas
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListaUiState())
@@ -72,13 +74,26 @@ class ListaNotasViewModel(
         }
     }
 
+    // Ej 14: genera el resumen .txt a partir de lo que hay en la base.
+    fun onExportar() {
+        val notas = _uiState.value.notas
+        viewModelScope.launch {
+            try {
+                val archivo = exportador.exportar(notas)
+                _uiState.update { it.copy(mensaje = "Exportadas ${notas.size} notas a $archivo", errorOperacion = null) }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(errorOperacion = "No se pudo exportar") }
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "ListaNotasViewModel"
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[APPLICATION_KEY]) as MvvmLabApp
-                ListaNotasViewModel(app.contenedor.notaRepository)
+                ListaNotasViewModel(app.contenedor.notaRepository, app.contenedor.exportadorNotas)
             }
         }
     }

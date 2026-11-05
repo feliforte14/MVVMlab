@@ -1904,5 +1904,146 @@ reiniciar la app. Eso va en <code>src/androidTest</code> (en el dispositivo) o c
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 14 — Room y archivo no son lo mismo</h2>
+<p><strong>Consigna:</strong> crear un adaptador del contrato de notas que utilice un DAO de Room. Compararlo con el Repository de archivo: qué consultas son fáciles,
+qué errores aparecen, cómo se actualiza la UI y qué datos no conviene poner en un txt. Mantener un archivo de texto para preferencias o un borrador exportable,
+sin duplicar toda la base. <strong>Desafío:</strong> tabla con tres decisiones de almacenamiento justificadas.
+<br>Rama: <code>ej14-room</code> · Archivos nuevos: <code>RoomNotaRepository.kt</code> (Entity, DAO, Database, adaptador), <code>ExportadorNotas.kt</code></p>
+
+<div class="caja clave">
+  <strong class="titulo">Room</strong>
+  Biblioteca oficial sobre <strong>SQLite</strong> (la base de datos que trae Android). Se declaran tablas (<code>@Entity</code>), consultas (<code>@Dao</code> con SQL) y la base
+  (<code>@Database</code>); <strong>KSP</strong> genera en compilación el código que las implementa y <em>verifica el SQL</em>: una consulta mal escrita no compila.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · Entity, DAO y Database</h3>
+<pre>@Entity(tableName = "notas")
+data class NotaEntity(
+    @PrimaryKey val id: String,
+    val titulo: String,
+    val contenido: String,
+    val actualizadaEn: Long                 // columna técnica: la pantalla no la necesita
+)
+
+@Dao
+interface NotaDao {
+    @Query("SELECT * FROM notas ORDER BY actualizadaEn DESC")
+    fun observarTodas(): Flow&lt;List&lt;NotaEntity&gt;&gt;     // Room emite cuando la tabla cambia
+    @Query("SELECT * FROM notas WHERE id = :id")
+    suspend fun obtener(id: String): NotaEntity?
+    @Upsert suspend fun guardar(nota: NotaEntity)      // INSERT o UPDATE según la clave
+    @Query("DELETE FROM notas WHERE id = :id")
+    suspend fun eliminar(id: String)
+    @Query("SELECT * FROM notas WHERE titulo LIKE '%' || :texto || '%' ORDER BY titulo")
+    fun buscarPorTitulo(texto: String): Flow&lt;List&lt;NotaEntity&gt;&gt;
+}
+
+@Database(entities = [NotaEntity::class], version = 1, exportSchema = false)
+abstract class AppDatabase : RoomDatabase() { abstract fun notaDao(): NotaDao }</pre>
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · El adaptador: el contrato de siempre, con el DAO adentro</h3>
+<pre>class RoomNotaRepository(private val dao: NotaDao, ...) : NotaRepository {
+    override fun observarTodas() = dao.observarTodas().map { filas -&gt; filas.map { it.aDominio() } }
+                                                      .catch { e -&gt; throw traducir(e) }
+    override suspend fun guardar(nota: Nota) = conErrores { dao.guardar(nota.aEntity(reloj())) }
+    ...
+}
+fun NotaEntity.aDominio() = Nota(id, titulo, contenido)                 // Entity → dominio
+fun Nota.aEntity(actualizadaEn: Long) = NotaEntity(id, titulo, contenido, actualizadaEn)</pre>
+</div>
+<ul>
+  <li><strong>Mismo contrato <code>NotaRepository</code></strong> que el archivo (Ej 10–12): <code>ListaNotasViewModel</code>, <code>DetalleNotaViewModel</code> y las pantallas
+  <strong>no cambiaron</strong>. En <code>ContenedorApp</code> se agregó <code>OrigenDatos.ROOM</code> y se eligió con la misma única línea del Ej 11.</li>
+  <li><strong>Funciones de extensión</strong> (<code>fun NotaEntity.aDominio()</code>): agregan una función a una clase existente sin modificarla.</li>
+  <li><strong>Traducción de errores:</strong> Room falla con <code>SQLiteException</code>; el adaptador la convierte en <code>IOException</code>, que es lo que el contrato y los
+  ViewModels ya manejan (Ej 9). Así el ViewModel tampoco conoce SQL en los errores.</li>
+  <li><strong>Una sola instancia de <code>AppDatabase</code></strong> en el contenedor (<code>by lazy</code>, <code>Room.databaseBuilder(app, ..., "notas.db")</code>): abrir la base
+  es costoso y dos instancias sobre el mismo archivo podrían pisarse.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Lo que sí va a un archivo de texto: el resumen exportable</h3>
+<pre>fun interface ExportadorNotas { suspend fun exportar(notas: List&lt;Nota&gt;): String }
+
+class ArchivoExportadorNotas(carpeta: File) : ExportadorNotas {
+    override suspend fun exportar(notas: List&lt;Nota&gt;) = withContext(Dispatchers.IO) {
+        archivo.writeText(/* "MIS NOTAS — exportado el ..." + cada nota */, Charsets.UTF_8)
+        "notas_exportadas.txt"
+    }
+}</pre>
+</div>
+<p>Botón “Exportar .txt” en la lista → <code>ListaNotasViewModel.onExportar()</code>. El <code>.txt</code> se genera <strong>a partir de la base</strong> y nadie lo vuelve a leer para
+cargar notas: no es una segunda fuente de verdad, es una <em>salida</em> legible por personas. <code>fun interface</code> permite reemplazarlo en los tests con una lambda:
+<code>ExportadorNotas { "falso.txt" }</code>.</p>
+
+<div class="figs"><figure><img src="img/ej14_lista.png" style="height:250px"><br>Lista con Room: la nota editada sube primera<br>(ORDER BY actualizadaEn), “Exportar .txt”</figure></div>
+
+<div class="caja ojo">
+  <strong class="titulo">Dependencias agregadas (justificadas)</strong>
+  Plugin <code>com.google.devtools.ksp 2.3.13</code> (genera el código de Room; es la misma versión que ya estaba en la caché de Gradle de otro proyecto) y
+  <code>room-runtime</code>, <code>room-ktx</code>, <code>room-compiler</code> <code>2.8.5</code>. No se tocaron las versiones de AGP, Kotlin ni Compose.
+</div>
+
+<h3>Comparación: archivo JSON vs. Room</h3>
+<table>
+  <tr><th style="width:20%"></th><th>Archivo <code>notas.json</code> (Ej 10–12)</th><th>Room (Ej 14)</th></tr>
+  <tr><td>Consultas fáciles</td><td>Ninguna: para buscar, filtrar u ordenar hay que leer <em>todo</em> el archivo y hacerlo en Kotlin</td>
+      <td>Buscar (<code>LIKE</code>), ordenar (<code>ORDER BY</code>), filtrar (<code>WHERE</code>), contar: una línea de SQL, verificada al compilar</td></tr>
+  <tr><td>Escritura</td><td>Reescribe el archivo entero en cada cambio (con temporal + renombrado para no corromperlo)</td>
+      <td>Modifica solo la fila; transacciones atómicas incluidas</td></tr>
+  <tr><td>Errores que aparecen</td><td><code>IOException</code>, archivo truncado / JSON inválido (<code>FormatoInvalidoException</code>), concurrencia (Mutex a mano)</td>
+      <td><code>SQLiteException</code> (disco lleno, base bloqueada), errores de migración al cambiar el esquema (<code>version</code>); el SQL inválido se detecta al compilar</td></tr>
+  <tr><td>Cómo se actualiza la UI</td><td>El Repository mantiene un <code>StateFlow</code> y emite a mano después de escribir (Ej 12)</td>
+      <td>El DAO devuelve <code>Flow</code> y Room re-emite solo cuando la tabla cambia</td></tr>
+  <tr><td>Legible por una persona</td><td>Sí (se abre con cualquier editor)</td><td>No (archivo binario SQLite)</td></tr>
+</table>
+
+<h3>Desafío: tres decisiones de almacenamiento</h3>
+<table>
+  <tr><th style="width:24%">Dato</th><th style="width:20%">Dónde</th><th>Por qué</th></tr>
+  <tr><td>Las notas (registros con id, título, contenido, fecha)</td><td><strong>Room</strong></td>
+      <td>Son registros estructurados que se buscan, ordenan, editan y borran de a uno; la UI necesita enterarse de cada cambio (Flow) y no pueden corromperse a medias.</td></tr>
+  <tr><td>Resumen para compartir o imprimir</td><td><strong>Archivo .txt</strong> (<code>notas_exportadas.txt</code>)</td>
+      <td>Es texto libre para una persona, se genera a pedido desde la base y no se vuelve a leer: no compite como fuente de verdad.</td></tr>
+  <tr><td>Lo que se está escribiendo en el formulario</td><td><strong>ViewModel</strong> (memoria)</td>
+      <td>Es estado de pantalla: cambia en cada tecla, solo importa mientras se edita y sobrevive a la rotación. Se persiste recién al pulsar Guardar.</td></tr>
+</table>
+<p><strong>¿Qué datos no conviene poner en un txt?</strong> Registros que se consultan o modifican de a uno (habría que reescribir todo), datos relacionados entre sí
+(notas y etiquetas), datos que cambian seguido o desde varios lugares a la vez, y datos sensibles (un txt se lee y edita fácil).</p>
+
+<h3>Pruebas</h3>
+<table>
+  <tr><th style="width:44%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Crear “Parcial DA1” y “Compras” con Room</td><td>“2 notas”; se crea <code>databases/notas.db</code> ✅</td></tr>
+  <tr><td>Editar “Parcial DA1”</td><td>La lista se actualiza sola y la nota sube primera (ORDER BY actualizadaEn DESC) ✅</td></tr>
+  <tr><td>Exportar .txt</td><td>“Exportadas 2 notas a notas_exportadas.txt”; el archivo tiene el resumen legible ✅</td></tr>
+  <tr><td><code>force-stop</code> y reabrir</td><td>“2 notas” desde la base ✅</td></tr>
+  <tr><td>Tests JVM (fake, sin Room)</td><td>14/14: los ViewModels no cambiaron ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Quién transforma Entity en modelo de dominio si son distintos?</strong><br>
+El <strong>adaptador</strong> <code>RoomNotaRepository</code> (capa de datos), con <code>aDominio()</code> y <code>aEntity()</code>. Hacia arriba solo sale <code>Nota</code>: ni el ViewModel ni la
+pantalla conocen <code>NotaEntity</code> ni sus columnas técnicas (<code>actualizadaEn</code>).</p>
+<p><strong>2. ¿Qué gana el ViewModel al no conocer SQL?</strong><br>
+Que no cambia si cambia la base (otra tabla, otra consulta, otra biblioteca, un servidor), que se prueba con un fake sin base de datos (Ej 13) y que su
+código queda en el idioma del problema (“guardar nota”), no en el del almacenamiento (“INSERT INTO...”).</p>
+<p><strong>3. ¿Qué sucede si hay dos fuentes de verdad sin política clara?</strong><br>
+Se desincronizan: una pantalla lee de Room y otra del JSON, se guarda en una y no en la otra, y no hay forma de saber cuál tiene razón (o una sobrescribe a la
+otra al sincronizar). Por eso la política: <strong>Room es la única fuente de verdad de las notas</strong>; el txt es una exportación de solo salida.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Entity (tabla) ≠ Nota (dominio); el adaptador traduce datos y errores.</li>
+    <li>Mismo contrato: ViewModels, pantallas y tests sin cambios.</li>
+    <li>Room: consultas SQL verificadas, escrituras por fila, Flow automático.</li>
+    <li>Archivo de texto solo para lo que es texto: un resumen exportable, no una copia de la base.</li>
+  </ol>
+</div>
+
 </body>
 </html>

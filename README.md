@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 13: Probar el ViewModel sin Android ni archivos
+# MvvmLab — Ejercicio 14: Room y archivo no son lo mismo
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -24,56 +24,57 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej10-lista-persistente` | 10 — De un texto a una lista persistente |
 | `ej11-dependencias` | 11 — Dependencias: ¿quién crea el Repository? |
 | `ej12-dos-pantallas` | 12 — Dos pantallas, una información |
-| **`ej13-tests`** | **13 — Probar el ViewModel sin Android ni archivos** ← esta rama |
+| `ej13-tests` | 13 — Probar el ViewModel sin Android ni archivos |
+| **`ej14-room`** | **14 — Room y archivo no son lo mismo** ← esta rama |
 
 ---
 
 ## Consigna
 
-Construir un Repository falso para pruebas, con datos prefijados y posibilidad de provocar una falla. Escribir pruebas del
-ViewModel para carga inicial, validación, guardado correcto y error de escritura. Justificar los controladores de corrutinas.
-**Desafío:** verificar que una solicitud inválida nunca invoca guardar.
+Crear un adaptador del contrato de notas que use un DAO de Room. Compararlo con el Repository de archivo. Mantener un archivo
+de texto para un borrador exportable, sin duplicar toda la base. **Desafío:** tabla con tres decisiones de almacenamiento.
 
-## Archivos (en `app/src/test/java/com/example/mvvmlab/`)
+## Archivos
 
 | Archivo | Contenido |
 |---|---|
-| `FakeNotaRepository.kt` | Implementa `NotaRepository`: datos prefijados, `fallarLectura` / `fallarEscritura`, registro `guardadas` / `eliminadas` |
-| `MainDispatcherRule.kt` | Reemplaza `Dispatchers.Main` por `UnconfinedTestDispatcher` en cada test |
-| `NotasViewModelTest.kt` | 9 tests de `ListaNotasViewModel` y `DetalleNotaViewModel` |
-| `ValidadorNotaTest.kt` | 5 tests del Ej 5 |
+| `RoomNotaRepository.kt` | **Nuevo**: `NotaEntity`, `NotaDao` (Flow, `@Upsert`, búsqueda `LIKE`), `AppDatabase`, `RoomNotaRepository` (adaptador + traducción `SQLiteException` → `IOException`), `aDominio()` / `aEntity()` |
+| `ExportadorNotas.kt` | **Nuevo**: `fun interface ExportadorNotas` + `ArchivoExportadorNotas` → `notas_exportadas.txt` |
+| `ContenedorApp.kt` | `OrigenDatos.ROOM` (elegido), `AppDatabase` única (`by lazy`), `exportadorNotas` |
+| `ListaNotasViewModel.kt`, `Pantallas.kt`, `NavegacionApp.kt` | Botón "Exportar .txt" y mensaje |
+| Gradle | Plugin KSP `2.3.13`; Room `2.8.5` (`runtime`, `ktx`, `compiler`) |
 
-Gradle: `testImplementation(kotlinx-coroutines-test 1.9.0)` (misma versión de corrutinas del proyecto) y
-`unitTests.isReturnDefaultValues = true` (para que `android.util.Log` no rompa los tests JVM).
+`DetalleNotaViewModel`, `PantallaDetalle` y los tests de ViewModels **no cambiaron** (mismo contrato).
 
-**Por qué el controlador de corrutinas:** `viewModelScope` usa `Dispatchers.Main` (hilo de UI de Android), que no existe en la
-JVM. La regla lo reemplaza; `UnconfinedTestDispatcher` ejecuta las corrutinas en el momento.
+## Archivo vs. Room
 
-## Resultado: 14/14 ✅
+| | Archivo `notas.json` | Room |
+|---|---|---|
+| Consultas | Leer todo y filtrar en Kotlin | SQL (`WHERE`, `LIKE`, `ORDER BY`) verificado al compilar |
+| Escritura | Reescribe todo (temporal + renombrado) | Por fila, transaccional |
+| Errores | `IOException`, JSON inválido, concurrencia a mano | `SQLiteException`, migraciones; SQL inválido no compila |
+| Actualizar la UI | `StateFlow` emitido a mano | `Flow` del DAO, automático |
 
-| Área | Tests |
-|---|---|
-| Carga inicial | `lista_cargaInicial_...`, `lista_siLaLecturaFalla_...`, `detalle_conId_...` |
-| Validación | `detalle_tituloVacio_...`, **`detalle_solicitudInvalida_nuncaInvocaGuardar`** (desafío) |
-| Guardado correcto | `detalle_notaValida_...`, `guardarEnElDetalle_actualizaLaLista_...` |
-| Error de escritura | `detalle_siFallaLaEscritura_...`, `lista_siFallaEliminar_...` |
-| Reglas (Ej 5) | 5 tests de `ValidadorNotaTest` |
+## Tres decisiones de almacenamiento (desafío)
 
-**Prueba de mutación:** con la validación desactivada a propósito fallan 2 tests (título vacío y "nunca invoca guardar");
-restaurado el código, pasan los 14.
+| Dato | Dónde | Por qué |
+|---|---|---|
+| Notas (registros) | **Room** | Se buscan, ordenan y editan de a uno; la UI se entera de cada cambio; no se corrompen a medias |
+| Resumen para compartir | **Archivo .txt** | Texto libre para personas, generado desde la base, nunca se relee: no es fuente de verdad |
+| Lo que se está escribiendo | **ViewModel** | Estado de pantalla; se persiste al pulsar Guardar |
 
-```bash
-./gradlew :app:testDebugUnitTest
-```
+## Pruebas
+
+Crear 2 notas ✅ · editar → la lista se actualiza sola y reordena ✅ · Exportar .txt ✅ · reabrir ✅ · tests 14/14 ✅
 
 ## Preguntas de la guía
 
-**¿Qué prueba quedaría innecesariamente difícil si el ViewModel creara su propio Repository?** Todas, en especial las de error:
-habría que hacer fallar un archivo real en un emulador. Con el fake alcanza `fallarEscritura = true`.
+**¿Quién transforma Entity en modelo de dominio?** El adaptador `RoomNotaRepository` (`aDominio()` / `aEntity()`).
 
-**¿Qué sí habría que probar en una prueba de integración con archivo real?** Que `ArchivoNotasRepository` escribe y relee el JSON
-(tildes, saltos de línea, comillas, `;`), que un archivo truncado da `FormatoInvalidoException`, la escritura con temporal y la
-persistencia tras reiniciar.
+**¿Qué gana el ViewModel al no conocer SQL?** No cambia si cambia la base, se prueba con un fake y habla el idioma del problema.
+
+**¿Qué sucede si hay dos fuentes de verdad sin política clara?** Se desincronizan. Política: Room es la única fuente de verdad;
+el txt es exportación de solo salida.
 
 ## Criterio de finalización
-- ✅ Hay al menos cuatro pruebas repetibles (14) y ninguna necesita abrir la pantalla.
+- ✅ La misma pantalla funciona con el contrato de Repository y se explica qué datos van a Room y cuáles a archivo.

@@ -49,10 +49,16 @@ fun PantallaLista(
     onAbrir: (String) -> Unit,          // navegar al detalle con el ID
     onNueva: () -> Unit,
     onEliminar: (String) -> Unit,
-    onReintentar: () -> Unit
+    onReintentar: () -> Unit,
+    onExportar: () -> Unit = {}
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Mis notas") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Mis notas") },
+                actions = { TextButton(onClick = onExportar) { Text("Exportar .txt") } }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onNueva) { Text("+", style = MaterialTheme.typography.headlineSmall) }
         }
@@ -78,6 +84,7 @@ fun PantallaLista(
                     )
                 }
                 estado.errorOperacion?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                estado.mensaje?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             }
             items(estado.notas, key = { it.id }) { nota ->
                 Card(

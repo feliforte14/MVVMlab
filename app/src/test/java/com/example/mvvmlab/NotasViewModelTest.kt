@@ -22,6 +22,9 @@ class NotasViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    // Ej 14: el exportador tambien se reemplaza por uno falso (una lambda).
+    private val exportadorFalso = ExportadorNotas { "falso.txt" }
+
     private val parcial = Nota("1", "Parcial DA1", "Repasar MVVM y Repository")
     private val compras = Nota("2", "Compras", "Yerba, café y galletitas")
 
@@ -34,7 +37,7 @@ class NotasViewModelTest {
     fun lista_cargaInicial_muestraLasNotasDelRepository() = runTest {
         val repo = FakeNotaRepository(listOf(parcial, compras))
 
-        val vm = ListaNotasViewModel(repo)
+        val vm = ListaNotasViewModel(repo, exportadorFalso)
 
         val estado = vm.uiState.value
         assertEquals(EstadoCarga.Listo, estado.carga)
@@ -45,7 +48,7 @@ class NotasViewModelTest {
     fun lista_siLaLecturaFalla_muestraErrorYNoSeCierra() = runTest {
         val repo = FakeNotaRepository(listOf(parcial)).apply { fallarLectura = true }
 
-        val vm = ListaNotasViewModel(repo)
+        val vm = ListaNotasViewModel(repo, exportadorFalso)
 
         assertTrue(vm.uiState.value.carga is EstadoCarga.Error)
     }
@@ -109,7 +112,7 @@ class NotasViewModelTest {
     @Test
     fun guardarEnElDetalle_actualizaLaLista_unaSolaFuenteDeVerdad() = runTest {
         val repo = FakeNotaRepository(listOf(parcial))
-        val lista = ListaNotasViewModel(repo)
+        val lista = ListaNotasViewModel(repo, exportadorFalso)
         val editor = detalle(repo, id = "1")
 
         editor.onContenidoChange("Repasar MVVM, Repository y tests")
@@ -139,7 +142,7 @@ class NotasViewModelTest {
     @Test
     fun lista_siFallaEliminar_muestraErrorYConservaLaNota() = runTest {
         val repo = FakeNotaRepository(listOf(parcial)).apply { fallarEscritura = true }
-        val vm = ListaNotasViewModel(repo)
+        val vm = ListaNotasViewModel(repo, exportadorFalso)
 
         vm.onEliminar("1")
 
