@@ -30,6 +30,72 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── MvvmLabApp.kt
+ ├── core/
+ │   ├── model/
+ │   │   ├── EstadoCarga.kt
+ │   ├── navigation/
+ │   │   ├── Rutas.kt
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ │   ├── util/
+ │   │   ├── Fechas.kt
+ ├── data/
+ │   ├── local/
+ │   │   ├── CuadernoDatabase.kt
+ │   │   ├── RegistroDao.kt
+ │   │   ├── RegistroEntity.kt
+ │   ├── mapper/
+ │   │   ├── RegistroMapper.kt
+ │   ├── repository/
+ │   │   ├── ArchivoBitacoraRepository.kt
+ │   │   ├── ArchivoResumen.kt
+ │   │   ├── FallaControladaRegistroRepository.kt
+ │   │   ├── RoomRegistroRepository.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Registro.kt
+ │   ├── repository/
+ │   │   ├── BitacoraRepository.kt
+ │   │   ├── GeneradorResumen.kt
+ │   │   ├── RegistroRepository.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorRegistro.kt
+ ├── presentation/
+ │   ├── AppCuaderno.kt
+ │   ├── bitacora/
+ │   │   ├── BitacoraUiState.kt
+ │   │   ├── BitacoraViewModel.kt
+ │   │   ├── PantallaBitacora.kt
+ │   ├── editar/
+ │   │   ├── EditarRegistroViewModel.kt
+ │   │   ├── EditarUiState.kt
+ │   │   ├── PantallaEditar.kt
+ │   ├── lista/
+ │   │   ├── ListaRegistrosViewModel.kt
+ │   │   ├── ListaUiState.kt
+ │   │   ├── PantallaLista.kt
+ ├── di/
+ │   ├── ContenedorApp.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── presentation/
+ │   ├── CuadernoTest.kt
+ ├── fake/
+ │   ├── FakeRegistroRepository.kt
+ ├── util/
+ │   ├── MainDispatcherRule.kt
+```
+
 ## Consigna
 
 App para guardar observaciones breves de una salida, recorrido, visita o actividad. Cada registro tiene id, título,
@@ -51,13 +117,13 @@ GeneradorResumen   ─► ArchivoResumen ─────────────
 
 | Capa | Archivos |
 |---|---|
-| View (Compose) | `PantallaLista.kt`, `PantallaEditar.kt`, `PantallaBitacora.kt`, `NavegacionApp.kt` |
-| ViewModel | `ViewModels.kt` (Lista, Editar, Bitácora), `ValidadorRegistro.kt` |
-| Contratos y modelo | `Modelo.kt` (`Registro`, `RegistroRepository`, `BitacoraRepository`, `GeneradorResumen`, `Fechas`) |
-| Room | `RegistroRoom.kt` (Entity, DAO con búsqueda `LIKE`, Database, adaptador) |
-| Archivos | `ArchivosCuaderno.kt` (bitácora, resumen, falla controlada) |
-| Dependencias | `ContenedorApp.kt` |
-| Tests | `app/src/test/.../CuadernoTest.kt` (11), `FakeRegistroRepository.kt`, `MainDispatcherRule.kt` |
+| View (Compose) | `presentation/lista/PantallaLista.kt`, `presentation/editar/PantallaEditar.kt`, `presentation/bitacora/PantallaBitacora.kt`, `presentation/AppCuaderno.kt` |
+| ViewModel | `presentation/{lista,editar,bitacora}/*ViewModel.kt` (Lista, Editar, Bitácora), `domain/validacion/ValidadorRegistro.kt` |
+| Contratos y modelo | `domain/model/Registro.kt + domain/repository/ + core/util/Fechas.kt` (`Registro`, `RegistroRepository`, `BitacoraRepository`, `GeneradorResumen`, `Fechas`) |
+| Room | `data/local/ + data/mapper/RegistroMapper.kt + data/repository/RoomRegistroRepository.kt` (Entity, DAO con búsqueda `LIKE`, Database, adaptador) |
+| Archivos | `data/repository/ (ArchivoBitacoraRepository, ArchivoResumen, FallaControladaRegistroRepository)` (bitácora, resumen, falla controlada) |
+| Dependencias | `di/ContenedorApp.kt` |
+| Tests | `app/src/test/.../CuadernoTest.kt` (11), `fake/FakeRegistroRepository.kt`, `util/MainDispatcherRule.kt` |
 
 ## Etapas 2 y 3 — Las dos persistencias
 

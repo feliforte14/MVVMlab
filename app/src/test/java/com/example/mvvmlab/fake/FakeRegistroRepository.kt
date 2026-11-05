@@ -1,10 +1,12 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.fake
 
+import com.example.mvvmlab.domain.model.Registro
+import com.example.mvvmlab.domain.repository.RegistroRepository
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
-import java.io.IOException
 
 // Repository FALSO del integrador (mismo patron que el Ej 13).
 class FakeRegistroRepository(iniciales: List<Registro> = emptyList()) : RegistroRepository {

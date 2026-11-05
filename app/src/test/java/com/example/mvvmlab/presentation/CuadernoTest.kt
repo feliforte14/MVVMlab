@@ -1,6 +1,15 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.domain.model.Registro
+import com.example.mvvmlab.domain.repository.GeneradorResumen
+import com.example.mvvmlab.domain.repository.RegistroRepository
+import com.example.mvvmlab.domain.validacion.ValidadorRegistro
+import com.example.mvvmlab.fake.FakeRegistroRepository
+import com.example.mvvmlab.presentation.editar.EditarRegistroViewModel
+import com.example.mvvmlab.presentation.lista.ListaRegistrosViewModel
+import com.example.mvvmlab.util.MainDispatcherRule
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

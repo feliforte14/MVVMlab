@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -9,36 +9,43 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.mvvmlab.core.navigation.Rutas
+import com.example.mvvmlab.presentation.bitacora.BitacoraViewModel
+import com.example.mvvmlab.presentation.bitacora.PantallaBitacora
+import com.example.mvvmlab.presentation.editar.EditarRegistroViewModel
+import com.example.mvvmlab.presentation.editar.PantallaEditar
+import com.example.mvvmlab.presentation.lista.ListaRegistrosViewModel
+import com.example.mvvmlab.presentation.lista.PantallaLista
 
-// Rutas: "lista" · "editar/{id}" (id o "nuevo") · "bitacora"
+// Rutas (core/navigation/Rutas.kt): lista · editar/{id} (id o "nuevo") · bitacora
 // Cada destino obtiene SU ViewModel; todos comparten las mismas
 // instancias de Repository (ContenedorApp).
 @Composable
 fun AppCuaderno() {
     val nav = rememberNavController()
 
-    NavHost(navController = nav, startDestination = "lista") {
+    NavHost(navController = nav, startDestination = Rutas.LISTA) {
 
-        composable("lista") {
+        composable(Rutas.LISTA) {
             val vm: ListaRegistrosViewModel = viewModel(factory = ListaRegistrosViewModel.Factory)
             val estado by vm.uiState.collectAsStateWithLifecycle()
             PantallaLista(
                 estado = estado,
                 onBusquedaChange = vm::onBusquedaChange,
-                onAbrir = { id -> nav.navigate("editar/$id") },
-                onNuevo = { nav.navigate("editar/${EditarRegistroViewModel.ID_NUEVO}") },
+                onAbrir = { id -> nav.navigate(Rutas.editar(id)) },
+                onNuevo = { nav.navigate(Rutas.editar(EditarRegistroViewModel.ID_NUEVO)) },
                 onFavorito = vm::onFavorito,
                 onEliminar = vm::onEliminar,
                 onGenerarResumen = vm::onGenerarResumen,
                 onCompartido = vm::onCompartido,
-                onBitacora = { nav.navigate("bitacora") },
+                onBitacora = { nav.navigate(Rutas.BITACORA) },
                 onReintentar = vm::onReintentar
             )
         }
 
         composable(
-            "editar/{${EditarRegistroViewModel.ARG_ID}}",
-            arguments = listOf(navArgument(EditarRegistroViewModel.ARG_ID) { type = NavType.StringType })
+            Rutas.EDITAR,
+            arguments = listOf(navArgument(Rutas.ARG_ID) { type = NavType.StringType })
         ) {
             val vm: EditarRegistroViewModel = viewModel(factory = EditarRegistroViewModel.Factory)
             val estado by vm.uiState.collectAsStateWithLifecycle()
@@ -53,7 +60,7 @@ fun AppCuaderno() {
             )
         }
 
-        composable("bitacora") {
+        composable(Rutas.BITACORA) {
             val vm: BitacoraViewModel = viewModel(factory = BitacoraViewModel.Factory)
             val estado by vm.uiState.collectAsStateWithLifecycle()
             PantallaBitacora(

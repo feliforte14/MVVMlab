@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.domain.validacion
 
 // Reglas de negocio de un registro (Kotlin puro, se prueban sin emulador).
 data class ErroresRegistro(

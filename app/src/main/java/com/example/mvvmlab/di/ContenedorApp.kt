@@ -1,7 +1,18 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.di
 
 import android.app.Application
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.room.Room
+import com.example.mvvmlab.MvvmLabApp
+import com.example.mvvmlab.data.local.CuadernoDatabase
+import com.example.mvvmlab.data.repository.ArchivoBitacoraRepository
+import com.example.mvvmlab.data.repository.ArchivoResumen
+import com.example.mvvmlab.data.repository.FallaControladaRegistroRepository
+import com.example.mvvmlab.data.repository.RoomRegistroRepository
+import com.example.mvvmlab.domain.repository.BitacoraRepository
+import com.example.mvvmlab.domain.repository.GeneradorResumen
+import com.example.mvvmlab.domain.repository.RegistroRepository
 
 // =====================================================================
 // Contenedor de dependencias (Ej 11) del Cuaderno de campo
@@ -32,12 +43,4 @@ class ContenedorApp(private val app: Application) {
     val generadorResumen: GeneradorResumen by lazy { ArchivoResumen(app.filesDir) }
 }
 
-class MvvmLabApp : Application() {
-    lateinit var contenedor: ContenedorApp
-        private set
-
-    override fun onCreate() {
-        super.onCreate()
-        contenedor = ContenedorApp(this)
-    }
-}
+fun CreationExtras.contenedor() = (checkNotNull(this[APPLICATION_KEY]) as MvvmLabApp).contenedor

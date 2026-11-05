@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.bitacora
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,7 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.data.repository.ArchivoBitacoraRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

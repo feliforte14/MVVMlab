@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.editar
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.core.util.Fechas
+import com.example.mvvmlab.domain.validacion.ErroresRegistro
+import com.example.mvvmlab.domain.validacion.ValidadorRegistro
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

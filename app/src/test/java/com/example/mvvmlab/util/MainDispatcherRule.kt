@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.util
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

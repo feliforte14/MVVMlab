@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.lista
 
 import android.content.Intent
 import androidx.compose.foundation.clickable
@@ -33,7 +33,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.core.util.Fechas
+import com.example.mvvmlab.domain.model.Registro
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
