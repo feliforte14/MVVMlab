@@ -26,6 +26,46 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── MvvmLabApp.kt
+ ├── core/
+ │   ├── model/
+ │   │   ├── EstadoCarga.kt
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── ArchivoNotasRepository.kt
+ │   │   ├── NotaRepositoryEnMemoria.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ │   ├── repository/
+ │   │   ├── NotaRepository.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorNota.kt
+ ├── presentation/
+ │   ├── notas/
+ │   │   ├── NotasUiState.kt
+ │   │   ├── NotasViewModel.kt
+ │   │   ├── PantallaNotas.kt
+ ├── di/
+ │   ├── ContenedorApp.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/
+ │   ├── validacion/
+ │   │   ├── ValidadorNotaTest.kt
+```
+
 ## Consigna
 
 Revisar dónde se construyen el Repository y el ViewModel. Suministrar la dependencia desde la capa de aplicación
@@ -37,9 +77,9 @@ Justificar si se usa `AndroidViewModel`.
 
 | Archivo | Cambio |
 |---|---|
-| `ContenedorApp.kt` | **Nuevo**: `enum OrigenDatos`, `ContenedorApp` (única decisión `origenDatos` + `notaRepository by lazy`) y `MvvmLabApp : Application` |
-| `NotaRepositoryEnMemoria.kt` | **Nuevo**: implementación en memoria del contrato (con `Mutex`) |
-| `NotasViewModel.kt` | La `Factory` pide `app.contenedor.notaRepository` en vez de construirlo |
+| `di/ContenedorApp.kt` | **Nuevo**: `enum OrigenDatos`, `ContenedorApp` (única decisión `origenDatos` + `notaRepository by lazy`) y `MvvmLabApp : Application` |
+| `data/repository/NotaRepositoryEnMemoria.kt` | **Nuevo**: implementación en memoria del contrato (con `Mutex`) |
+| `presentation/notas/NotasViewModel.kt` | La `Factory` pide `app.contenedor.notaRepository` en vez de construirlo |
 | `AndroidManifest.xml` | `android:name=".MvvmLabApp"` |
 
 ```

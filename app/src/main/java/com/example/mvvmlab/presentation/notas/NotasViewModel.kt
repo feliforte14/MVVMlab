@@ -1,46 +1,24 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.notas
 
 import android.util.Log
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.mvvmlab.MvvmLabApp
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
+import com.example.mvvmlab.domain.validacion.ValidadorNota
+import java.io.IOException
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
-import java.util.UUID
-
-// --- ESTADO -------------------------------------------------------------
-
-sealed interface EstadoCarga {
-    data object Cargando : EstadoCarga
-    data object Listo : EstadoCarga
-    data class Error(val mensaje: String) : EstadoCarga
-}
-
-data class NotasUiState(
-    val carga: EstadoCarga = EstadoCarga.Cargando,
-    val notas: List<Nota> = emptyList(),
-    // Formulario (sirve para alta y para edicion)
-    val editandoId: String? = null,          // null = nota nueva; si no, id de la nota en edicion
-    val titulo: String = "",
-    val contenido: String = "",
-    val errorTitulo: String? = null,
-    val errorContenido: String? = null,
-    val procesando: Boolean = false,         // guardando o eliminando
-    val errorOperacion: String? = null       // fallo al guardar/eliminar
-) {
-    val editando: Boolean get() = editandoId != null
-}
 
 // --- VIEWMODEL ----------------------------------------------------------
 
@@ -152,20 +130,4 @@ class NotasViewModel(
             }
         }
     }
-}
-
-@Composable
-fun PantallaNotasConViewModel(viewModel: NotasViewModel, modifier: Modifier = Modifier) {
-    val estado by viewModel.uiState.collectAsStateWithLifecycle()
-    PantallaNotas(
-        estado = estado,
-        onTituloChange = viewModel::onTituloChange,
-        onContenidoChange = viewModel::onContenidoChange,
-        onGuardar = viewModel::onGuardar,
-        onCancelarEdicion = viewModel::onCancelarEdicion,
-        onEditar = viewModel::onEditar,
-        onEliminar = viewModel::onEliminar,
-        onReintentar = viewModel::onReintentar,
-        modifier = modifier
-    )
 }

@@ -1,5 +1,9 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.data.repository
 
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
+import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -7,26 +11,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import java.io.File
-import java.io.IOException
-
-// =====================================================================
-// EJERCICIO 10 — De un texto a una lista persistente
-// =====================================================================
-
-// Modelo: una nota guardada. id identifica la nota para editarla o borrarla.
-data class Nota(
-    val id: String,
-    val titulo: String,
-    val contenido: String
-)
-
-// Contrato (el mismo del Ej 6): el ViewModel solo conoce esto.
-interface NotaRepository {
-    suspend fun obtenerTodas(): List<Nota>
-    suspend fun guardar(nota: Nota)          // alta si el id es nuevo, edicion si ya existe
-    suspend fun eliminar(id: String)
-}
 
 // El contenido del archivo existe pero no tiene el formato esperado
 // (archivo truncado, editado a mano, version vieja...). Es una IOException:

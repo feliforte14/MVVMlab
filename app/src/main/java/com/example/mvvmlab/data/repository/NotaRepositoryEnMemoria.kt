@@ -1,5 +1,7 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.data.repository
 
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
