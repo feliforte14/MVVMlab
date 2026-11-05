@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -9,6 +9,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.mvvmlab.core.navigation.Rutas
+import com.example.mvvmlab.presentation.detalle.DetalleNotaViewModel
+import com.example.mvvmlab.presentation.detalle.PantallaDetalle
+import com.example.mvvmlab.presentation.lista.ListaNotasViewModel
+import com.example.mvvmlab.presentation.lista.PantallaLista
 
 // =====================================================================
 // EJERCICIO 12 — Navegacion entre las dos pantallas
@@ -28,15 +33,15 @@ import androidx.navigation.navArgument
 fun AppNotas() {
     val nav = rememberNavController()
 
-    NavHost(navController = nav, startDestination = "lista") {
+    NavHost(navController = nav, startDestination = Rutas.LISTA) {
 
-        composable("lista") {
+        composable(Rutas.LISTA) {
             val vm: ListaNotasViewModel = viewModel(factory = ListaNotasViewModel.Factory)
             val estado by vm.uiState.collectAsStateWithLifecycle()
             PantallaLista(
                 estado = estado,
-                onAbrir = { id -> nav.navigate("detalle/$id") },
-                onNueva = { nav.navigate("detalle/${DetalleNotaViewModel.ID_NUEVA}") },
+                onAbrir = { id -> nav.navigate(Rutas.detalle(id)) },
+                onNueva = { nav.navigate(Rutas.detalle(DetalleNotaViewModel.ID_NUEVA)) },
                 onEliminar = vm::onEliminar,
                 onReintentar = vm::onReintentar,
                 onExportar = vm::onExportar
@@ -44,8 +49,8 @@ fun AppNotas() {
         }
 
         composable(
-            route = "detalle/{${DetalleNotaViewModel.ARG_ID}}",
-            arguments = listOf(navArgument(DetalleNotaViewModel.ARG_ID) { type = NavType.StringType })
+            route = Rutas.DETALLE,
+            arguments = listOf(navArgument(Rutas.ARG_ID) { type = NavType.StringType })
         ) {
             val vm: DetalleNotaViewModel = viewModel(factory = DetalleNotaViewModel.Factory)
             val estado by vm.uiState.collectAsStateWithLifecycle()

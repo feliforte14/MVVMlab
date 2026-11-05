@@ -1,7 +1,14 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.di
 
 import android.app.Application
 import androidx.room.Room
+import com.example.mvvmlab.data.local.AppDatabase
+import com.example.mvvmlab.data.repository.ArchivoExportadorNotas
+import com.example.mvvmlab.data.repository.ArchivoNotasRepository
+import com.example.mvvmlab.data.repository.NotaRepositoryEnMemoria
+import com.example.mvvmlab.data.repository.RoomNotaRepository
+import com.example.mvvmlab.domain.repository.ExportadorNotas
+import com.example.mvvmlab.domain.repository.NotaRepository
 
 // =====================================================================
 // EJERCICIO 11 — Dependencias: ¿quien crea el Repository?
@@ -49,18 +56,4 @@ class ContenedorApp(private val app: Application) {
 
     // Ej 14: el archivo de texto queda para el resumen exportable.
     val exportadorNotas: ExportadorNotas by lazy { ArchivoExportadorNotas(app.filesDir) }
-}
-
-// Application propia: Android la crea ANTES que cualquier Activity y la
-// mantiene mientras viva el proceso. Es el lugar natural del contenedor.
-// Se registra en AndroidManifest.xml con android:name=".MvvmLabApp".
-class MvvmLabApp : Application() {
-
-    lateinit var contenedor: ContenedorApp
-        private set
-
-    override fun onCreate() {
-        super.onCreate()
-        contenedor = ContenedorApp(this)
-    }
 }

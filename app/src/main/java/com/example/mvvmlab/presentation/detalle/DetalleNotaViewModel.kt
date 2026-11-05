@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.detalle
 
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
@@ -9,31 +9,18 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.mvvmlab.MvvmLabApp
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
+import com.example.mvvmlab.domain.validacion.ValidadorNota
+import java.io.IOException
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
-import java.util.UUID
-
-data class DetalleUiState(
-    val carga: EstadoCarga = EstadoCarga.Cargando,
-    val esNueva: Boolean = true,
-    val titulo: String = "",
-    val contenido: String = "",
-    // Version guardada (para detectar cambios sin guardar).
-    val tituloOriginal: String = "",
-    val contenidoOriginal: String = "",
-    val errorTitulo: String? = null,
-    val errorContenido: String? = null,
-    val guardando: Boolean = false,
-    val errorOperacion: String? = null,
-    val guardadoOk: Boolean = false          // la pantalla reacciona volviendo a la lista
-) {
-    val hayCambiosSinGuardar: Boolean
-        get() = titulo != tituloOriginal || contenido != contenidoOriginal
-}
 
 // ViewModel de la pantalla DETALLE/EDITOR.
 // Recibe por navegacion SOLO el id de la nota (no el objeto entero) y

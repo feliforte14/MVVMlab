@@ -29,6 +29,68 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── MvvmLabApp.kt
+ ├── core/
+ │   ├── model/
+ │   │   ├── EstadoCarga.kt
+ │   ├── navigation/
+ │   │   ├── Rutas.kt
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── local/
+ │   │   ├── AppDatabase.kt
+ │   │   ├── NotaDao.kt
+ │   │   ├── NotaEntity.kt
+ │   ├── mapper/
+ │   │   ├── NotaMapper.kt
+ │   ├── repository/
+ │   │   ├── ArchivoExportadorNotas.kt
+ │   │   ├── ArchivoNotasRepository.kt
+ │   │   ├── NotaRepositoryEnMemoria.kt
+ │   │   ├── RoomNotaRepository.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ │   ├── repository/
+ │   │   ├── ExportadorNotas.kt
+ │   │   ├── NotaRepository.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorNota.kt
+ ├── presentation/
+ │   ├── AppNotas.kt
+ │   ├── detalle/
+ │   │   ├── DetalleNotaViewModel.kt
+ │   │   ├── DetalleUiState.kt
+ │   │   ├── PantallaDetalle.kt
+ │   ├── lista/
+ │   │   ├── ListaNotasViewModel.kt
+ │   │   ├── ListaUiState.kt
+ │   │   ├── PantallaLista.kt
+ ├── di/
+ │   ├── ContenedorApp.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/
+ │   ├── validacion/
+ │   │   ├── ValidadorNotaTest.kt
+ ├── presentation/
+ │   ├── NotasViewModelTest.kt
+ ├── fake/
+ │   ├── FakeNotaRepository.kt
+ ├── util/
+ │   ├── MainDispatcherRule.kt
+```
+
 ## Consigna
 
 Crear un adaptador del contrato de notas que use un DAO de Room. Compararlo con el Repository de archivo. Mantener un archivo
@@ -38,10 +100,10 @@ de texto para un borrador exportable, sin duplicar toda la base. **Desafío:** t
 
 | Archivo | Contenido |
 |---|---|
-| `RoomNotaRepository.kt` | **Nuevo**: `NotaEntity`, `NotaDao` (Flow, `@Upsert`, búsqueda `LIKE`), `AppDatabase`, `RoomNotaRepository` (adaptador + traducción `SQLiteException` → `IOException`), `aDominio()` / `aEntity()` |
-| `ExportadorNotas.kt` | **Nuevo**: `fun interface ExportadorNotas` + `ArchivoExportadorNotas` → `notas_exportadas.txt` |
-| `ContenedorApp.kt` | `OrigenDatos.ROOM` (elegido), `AppDatabase` única (`by lazy`), `exportadorNotas` |
-| `ListaNotasViewModel.kt`, `Pantallas.kt`, `NavegacionApp.kt` | Botón "Exportar .txt" y mensaje |
+| `data/local/ + data/mapper/NotaMapper.kt + data/repository/RoomNotaRepository.kt` | **Nuevo**: `NotaEntity`, `NotaDao` (Flow, `@Upsert`, búsqueda `LIKE`), `AppDatabase`, `RoomNotaRepository` (adaptador + traducción `SQLiteException` → `IOException`), `aDominio()` / `aEntity()` |
+| `domain/repository/ExportadorNotas.kt + data/repository/ArchivoExportadorNotas.kt` | **Nuevo**: `fun interface ExportadorNotas` + `ArchivoExportadorNotas` → `notas_exportadas.txt` |
+| `di/ContenedorApp.kt` | `OrigenDatos.ROOM` (elegido), `AppDatabase` única (`by lazy`), `exportadorNotas` |
+| `presentation/lista/ListaNotasViewModel.kt`, `presentation/lista/PantallaLista.kt + presentation/detalle/PantallaDetalle.kt`, `presentation/AppNotas.kt` | Botón "Exportar .txt" y mensaje |
 | Gradle | Plugin KSP `2.3.13`; Room `2.8.5` (`runtime`, `ktx`, `compiler`) |
 
 `DetalleNotaViewModel`, `PantallaDetalle` y los tests de ViewModels **no cambiaron** (mismo contrato).

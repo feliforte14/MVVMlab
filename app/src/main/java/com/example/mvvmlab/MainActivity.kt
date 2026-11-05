@@ -4,7 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.presentation.AppNotas
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -13,7 +14,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MvvmLabTheme {
                 // Ej 12: la Activity solo aloja la navegacion. Cada pantalla
-                // obtiene su ViewModel dentro de su destino (NavegacionApp.kt).
+                // obtiene su ViewModel dentro de su destino (presentation/AppNotas.kt).
                 AppNotas()
             }
         }
