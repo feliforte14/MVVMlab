@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Apuntes MVVM – DA1</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root { --azul:#1d3a8a; --azul-claro:#eef2fb; --verde:#1f6b3a; --verde-claro:#eef7f0;
+          --ambar:#7a5a00; --ambar-claro:#fff8e1; --gris:#555; --borde:#cfd6e4; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt;
+         line-height: 1.45; color: #1a1a1a; background:#fff; margin:0; }
+  header.portada { border-bottom: 3px solid var(--azul); padding-bottom: 10px; margin-bottom: 18px; }
+  header.portada h1 { margin:0; font-size: 20pt; color: var(--azul); }
+  header.portada p { margin: 4px 0 0; color: var(--gris); }
+  h2 { font-size: 15pt; color: var(--azul); margin: 22px 0 6px; border-bottom: 1px solid var(--borde); padding-bottom: 4px; }
+  h3 { font-size: 11.5pt; margin: 16px 0 6px; }
+  p { margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.8pt; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--borde); padding: 5px 7px; vertical-align: top; text-align: left; }
+  th { background: var(--azul-claro); }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f2f4f8; padding: 0 3px; border-radius: 3px; }
+  pre { font-family: "SF Mono", Menlo, monospace; font-size: 8.4pt; background: #f6f7fa; border: 1px solid var(--borde);
+        border-radius: 6px; padding: 9px 11px; overflow-x: auto; white-space: pre; page-break-inside: avoid; margin: 8px 0; }
+  .caja { border-radius: 6px; padding: 8px 12px; margin: 10px 0; page-break-inside: avoid; }
+  .clave { background: var(--azul-claro); border-left: 4px solid var(--azul); }
+  .regla { background: var(--verde-claro); border-left: 4px solid var(--verde); }
+  .ojo { background: var(--ambar-claro); border-left: 4px solid var(--ambar); }
+  .caja strong.titulo { display:block; margin-bottom: 3px; }
+  .tag { display:inline-block; padding: 0 6px; border-radius: 10px; font-size: 8.8pt; font-weight: 600; }
+  .v { background:#e3ecff; color:#1d3a8a; } .vm { background:#e5f5ea; color:#1f6b3a; } .r { background:#fff0d6; color:#7a5a00; }
+  ul, ol { margin: 4px 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  .salto { page-break-before: always; }
+  .bloque { break-inside: avoid; page-break-inside: avoid; }
+  h2, h3 { break-after: avoid; page-break-after: avoid; }
+</style>
+</head>
+<body>
+
+<header class="portada">
+  <h1>Apuntes – MVVM y Repository</h1>
+  <p>Desarrollo de Aplicaciones I · UADE · Guía de Ejercicios: MVVM y Repository (v1.0)</p>
+  <p>Proyecto: <code>MvvmLab</code> · Felipe Forte</p>
+</header>
+
+<h2>Ejercicio 1 — ¿Quién está haciendo demasiado?</h2>
+
+<p><strong>Consigna:</strong> tomar una pantalla donde todo está mezclado, marcar dónde se dibuja la interfaz, dónde se validan
+los datos, dónde se modifica la lista y dónde se guarda, y ubicar cada responsabilidad en
+<em>View</em>, <em>ViewModel</em> o <em>Model/Repository</em>. Todavía <strong>no</strong> se cambia la implementación.</p>
+
+<h3>Conceptos base</h3>
+
+<div class="caja clave">
+  <strong class="titulo">MVVM = separar en 3 responsabilidades</strong>
+  <ul>
+    <li><span class="tag v">View (Compose)</span> <strong>dibuja</strong> el estado y <strong>avisa</strong> lo que hace el usuario (clicks, texto). No decide nada.</li>
+    <li><span class="tag vm">ViewModel</span> <strong>recibe</strong> la acción del usuario, <strong>decide</strong> (valida, coordina) y <strong>expone</strong> el estado de pantalla.</li>
+    <li><span class="tag r">Model / Repository</span> <strong>obtiene y guarda</strong> los datos (memoria, archivo, Room, API). No sabe nada de pantallas.</li>
+  </ul>
+  <p style="margin-bottom:0"><strong>UI = f(estado):</strong> la pantalla es una función del estado.</p>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">¿Cómo decido dónde va cada cosa?</strong>
+  <p>El criterio <strong>no</strong> es “¿declara una variable?” — hay variables en las tres capas. Las preguntas útiles son:</p>
+  <ol>
+    <li><strong>¿Esto dibuja algo?</strong> → View. <em>(Test: si cambio Compose por una web, ¿tengo que reescribir esta línea? Sí → View.)</em></li>
+    <li><strong>¿Es una regla que valdría igual en cualquier interfaz?</strong> → ViewModel.</li>
+    <li><strong>¿Este dato tiene que sobrevivir si cierro la app?</strong> Sí → dato real → Repository. No, solo importa mientras uso la pantalla → estado de pantalla → ViewModel.</li>
+  </ol>
+  <p style="margin-bottom:0"><em>Ejemplo:</em> en WhatsApp, el mensaje que estás escribiendo (borrador) es de la pantalla; los mensajes ya enviados se guardan.</p>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">El ViewModel decide QUÉ mostrar. La View decide CÓMO mostrarlo.</strong>
+  “Hay un error: tarea vacía” → ViewModel. “El error va en rojo, debajo del botón” → View.
+</div>
+
+<div class="bloque"><h3>Código analizado (pantalla “mal hecha a propósito”)</h3>
+<pre>@Composable
+fun PantallaTareas(context: Context, modifier: Modifier = Modifier) {
+    var texto by remember { mutableStateOf("") }                    // (A)
+    var tareas by remember { mutableStateOf(listOf&lt;String&gt;()) }     // (B)
+    var error by remember { mutableStateOf&lt;String?&gt;(null) }         // (C)
+
+    Column(modifier.padding(16.dp)) {                                // (D)
+        Text("Mis tareas (${tareas.size})")
+        OutlinedTextField(value = texto, onValueChange = { texto = it })
+
+        Button(onClick = {
+            if (texto.isBlank()) {                                   // (E)
+                error = "La tarea no puede estar vacía"
+            } else if (tareas.contains(texto)) {                     // (F)
+                error = "Esa tarea ya existe"
+            } else {
+                tareas = tareas + texto                              // (G)
+                File(context.filesDir, "tareas.txt")                 // (H)
+                    .writeText(tareas.joinToString("\n"))
+                texto = ""                                           // (I)
+                error = null
+            }
+        }) { Text("Agregar") }
+
+        error?.let { Text(it, color = Color.Red) }                   // (J)
+        LazyColumn { items(tareas) { Text(it) } }                    // (K)
+    }
+}</pre></div>
+
+<div class="bloque"><h3>Resultado: tabla de responsabilidades (entregable)</h3>
+<table>
+  <tr><th style="width:7%">Letra</th><th style="width:30%">Código</th><th>Qué hace</th><th style="width:16%">Dónde va</th></tr>
+  <tr><td>(A)</td><td><code>var texto</code></td><td>Borrador que escribe el usuario; no sobrevive al cierre</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(B)</td><td><code>var tareas</code></td><td>Lista real de tareas; tiene que sobrevivir al cierre</td><td><span class="tag r">Repository</span></td></tr>
+  <tr><td>(C)</td><td><code>var error</code></td><td>Mensaje de error actual (dato del estado de pantalla)</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(D)</td><td><code>Column</code>, <code>Text</code>, <code>OutlinedTextField</code></td><td>Dibuja la pantalla</td><td><span class="tag v">View</span></td></tr>
+  <tr><td>(E)</td><td><code>texto.isBlank()</code></td><td>Regla: no se agregan tareas vacías</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(F)</td><td><code>tareas.contains(texto)</code></td><td>Regla: no se agregan tareas repetidas</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(G)</td><td><code>tareas = tareas + texto</code></td><td>Agrega la tarea a la lista (el dueño del dato la modifica)</td><td><span class="tag r">Repository</span></td></tr>
+  <tr><td>(H)</td><td><code>File(...).writeText(...)</code></td><td>Guarda las tareas en un archivo</td><td><span class="tag r">Repository</span></td></tr>
+  <tr><td>(I)</td><td><code>texto = ""</code></td><td>Limpia el campo solo si la tarea se agregó bien (decisión sobre un dato del ViewModel)</td><td><span class="tag vm">ViewModel</span></td></tr>
+  <tr><td>(J)</td><td><code>error?.let { Text(it, Color.Red) }</code></td><td>Muestra el error en rojo (el error es del VM; dibujarlo es de la View)</td><td><span class="tag v">View</span></td></tr>
+  <tr><td>(K)</td><td><code>LazyColumn</code></td><td>Muestra la lista en pantalla</td><td><span class="tag v">View</span></td></tr>
+</table></div>
+
+<div class="caja ojo">
+  <strong class="titulo">Errores frecuentes (los que cometí y corregí)</strong>
+  <ul>
+    <li>Pensar que (A), (B) y (C) van al Repository “porque declaran variables”. Solo (B) es un dato que debe persistir.</li>
+    <li>Poner (I) en la View: <code>texto</code> es del ViewModel, y quien es dueño de un dato es quien lo modifica.</li>
+    <li>Poner (J) en el ViewModel: el <em>error</em> es del ViewModel, pero <em>mostrarlo</em> con <code>Text</code> y <code>Color.Red</code> es de la View.</li>
+  </ul>
+</div>
+
+<h3>La cadena completa de “Agregar”</h3>
+<ol>
+  <li><span class="tag v">View</span> el usuario aprieta <em>Agregar</em> → avisa al ViewModel.</li>
+  <li><span class="tag vm">ViewModel</span> aplica las reglas (E) y (F). Si pasan → le pide al Repository que agregue; limpia el campo (I).</li>
+  <li><span class="tag r">Repository</span> agrega la tarea (G) y la guarda en el archivo (H).</li>
+</ol>
+<p>Repository = <strong>dueño del dato</strong> · ViewModel = <strong>intermediario</strong> (lo pide y lo prepara) · View = <strong>solo lo muestra</strong>.
+La lista “verdadera” vive en un solo lugar: <strong>fuente de verdad única</strong>.</p>
+
+<div class="bloque"><h3>Desafío: las dos flechas (UDF – flujo unidireccional de datos)</h3>
+<pre>            EVENTO (sube)                      operación
+  View  ─────────────────────►  ViewModel  ──────────────►  Repository
+        "el usuario apretó                   "agregá esta
+         Agregar con 'Estudiar'"              tarea"
+
+            ESTADO (baja)
+  View  ◄─────────────────────  ViewModel
+        texto = "", error = null,
+        tareas = [..., "Estudiar"]</pre></div>
+
+<div class="caja clave">
+  <strong class="titulo">Evento vs. estado</strong>
+  <ul>
+    <li><strong>Evento</strong> = algo que <em>pasó</em> (un click, una tecla). Es puntual.</li>
+    <li><strong>Estado</strong> = cómo <em>está</em> la pantalla ahora. Se puede consultar en cualquier momento.</li>
+    <li><strong>UDF:</strong> los eventos suben y el estado baja. La View nunca modifica el estado por su cuenta: solo avisa y redibuja.</li>
+  </ul>
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué trabajo tendría que seguir funcionando aunque mañana cambiemos Compose por otra interfaz?</strong><br>
+Las <strong>reglas</strong> (E, F: no vacía, no repetida) y el <strong>manejo de datos</strong> (G, H: agregar y guardar).
+Es decir, todo lo que va en ViewModel y Repository.</p>
+<p><strong>2. ¿Qué datos existen sólo mientras se está escribiendo un formulario?</strong><br>
+<code>texto</code> (el borrador) y <code>error</code> (el mensaje actual). Son estado de pantalla y no se guardan en el archivo.</p>
+
+<div class="caja ojo">
+  <strong class="titulo">Señal de alarma: <code>Context</code> en un composable</strong>
+  <code>PantallaTareas</code> recibe un <code>Context</code> solo para poder escribir el archivo (H). La guía advierte
+  no aceptar soluciones que “llevan Context a todos los composables” o “abren archivos desde un botón”.
+  Es una pista de que el acceso a archivos está en el lugar equivocado: debería estar en el Repository.
+</div>
+
+<h3>Kotlin / Compose que apareció en el camino</h3>
+<table>
+  <tr><th style="width:32%">Elemento</th><th>Qué es</th></tr>
+  <tr><td><code>Unresolved reference: X</code></td><td>Kotlin no sabe qué es X: falta el <code>import</code>, está mal escrito o la función/clase no existe.</td></tr>
+  <tr><td><code>var x by remember { mutableStateOf(...) }</code></td><td>Estado observable que sobrevive a la recomposición. El <code>by</code> necesita los imports <code>getValue</code>/<code>setValue</code>.</td></tr>
+  <tr><td><code>LocalContext.current</code></td><td>Forma de obtener el <code>Context</code> de Android dentro de un composable.</td></tr>
+  <tr><td><code>modifier: Modifier = Modifier</code></td><td>Convención: permite que quien llama le pase padding, tamaño, etc. (por ejemplo el <code>innerPadding</code> del Scaffold).</td></tr>
+  <tr><td><code>@Preview</code> / <code>@Composable</code></td><td>Anotaciones: “etiquetas” que siempre se aplican a una función. Solas, sin función debajo, no compilan.</td></tr>
+</table>
+
+</body>
+</html>
