@@ -32,6 +32,9 @@
   ul, ol { margin: 4px 0 8px; padding-left: 20px; }
   li { margin: 2px 0; }
   .salto { page-break-before: always; }
+  .figs { display:flex; gap:10px; align-items:flex-end; justify-content:center; margin:10px 0; break-inside: avoid; }
+  .figs figure { margin:0; flex:0 0 auto; text-align:center; font-size:8.6pt; color:var(--gris); }
+  .figs img { border:1px solid var(--borde); border-radius:6px; display:block; margin:0 auto 4px; }
   .bloque { break-inside: avoid; page-break-inside: avoid; }
   h2, h3 { break-after: avoid; page-break-after: avoid; }
 </style>
@@ -477,6 +480,194 @@ si cualquier situación se dibuja pasando solo un <code>NotaUiState</code>, la p
   <strong class="titulo">Para comprobar que se entendió</strong>
   Si en <code>alEditarTitulo</code> se sacara el <code>error = null</code> y quedara solo <code>estado.copy(titulo = nuevo)</code>, ¿qué pasaría en la pantalla
   al apretar Guardar con el título vacío y después empezar a escribir?
+</div>
+
+
+<h2 class="salto">Ejercicio 3 — Primer ViewModel, sin magia</h2>
+
+<p><strong>Consigna:</strong> mover la lógica del ejercicio anterior a una clase que extienda <code>ViewModel</code>. La pantalla recibe estado y
+funciones de evento, sin decidir cómo se guarda una nota. Obtener el ViewModel con el mecanismo apropiado del proyecto y comprobar qué sucede al
+rotar el emulador. <strong>Desafío:</strong> contador de intentos de guardado para observar la vida del ViewModel.
+<br>Rama: <code>ej03-viewmodel</code> · Archivos: <code>NotaViewModel.kt</code> (ViewModel), <code>NotaUiState.kt</code> (modelo y estado), <code>PantallaNota.kt</code> (View)</p>
+
+<h3>Paso 0 · ¿Qué problema resuelve?</h3>
+<p>En el Ej 2 el dueño del estado era un composable con <code>remember</code>. <code>remember</code> vive mientras vive <strong>la pantalla</strong>.
+Pero cuando el teléfono <strong>rota</strong>, Android <strong>destruye y vuelve a crear la Activity</strong> (es un <em>cambio de configuración</em>; también pasa
+al cambiar idioma, modo oscuro o tamaño de ventana). Con la Activity se va todo lo que estaba en <code>remember</code>: <strong>se borra lo escrito</strong>.</p>
+
+<div class="figs">
+  <figure><img src="img/ej03_remember_antes.png" style="height:190px"><br>Ej 2 (remember)<br>antes de rotar</figure>
+  <figure><img src="img/ej03_remember_despues.png" style="width:255px"><br>Ej 2 (remember) después de rotar:<br><strong>se perdió todo</strong></figure>
+  <figure><img src="img/ej03_viewmodel_rotado.png" style="width:255px"><br>Ej 3 (ViewModel) después de rotar:<br><strong>se conserva todo</strong> (intentos: 2)</figure>
+</div>
+<p style="text-align:center;font-size:9pt;color:var(--gris)">Capturas reales del emulador (Pixel 8).</p>
+
+<div class="caja clave">
+  <strong class="titulo">ViewModel</strong>
+  Clase que guarda el <strong>estado de pantalla</strong> y la <strong>lógica</strong> de una pantalla, y que <strong>sobrevive a los cambios de configuración</strong>.
+  Android la mantiene viva mientras la pantalla “exista para el usuario”, aunque la Activity se destruya y recree por dentro.
+  No dibuja nada y no conoce la Activity.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · La clase <code>NotaViewModel</code></h3>
+<pre>class NotaViewModel : ViewModel() {          // ": ViewModel()" = hereda de ViewModel
+
+    var estado by mutableStateOf(NotaUiState())
+        private set                           // afuera se LEE, solo el VM lo CAMBIA
+
+    var intentosGuardado by mutableStateOf(0) // desafío
+        private set
+
+    init { Log.d(TAG, "ViewModel CREADO") }   // se ejecuta UNA vez al crearse
+    ...
+}</pre>
+</div>
+<ul>
+  <li><strong><code>: ViewModel()</code></strong>: <code>NotaViewModel</code> <em>hereda</em> de la clase <code>ViewModel</code> de Android; eso es lo que le da la capacidad de sobrevivir a la rotación.</li>
+  <li><strong>Mismo <code>NotaUiState</code> del Ej 2</strong>: el estado no cambió, cambió <em>quién es su dueño</em>.</li>
+  <li><strong><code>private set</code></strong>: la pantalla puede leer <code>viewModel.estado</code> pero <strong>no</strong> puede hacer <code>viewModel.estado = ...</code>.
+  Solo el ViewModel modifica su estado → UDF garantizado por el compilador. (En el Ej 4 esto se hace con <code>StateFlow</code>.)</li>
+  <li><strong><code>init { }</code></strong>: bloque que corre al construir el objeto. El <code>Log.d</code> permite ver en <strong>Logcat</strong> (filtro <code>NotaViewModel</code>) cuántas veces se crea.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · Los eventos ahora son métodos del ViewModel</h3>
+<pre>fun onTituloChange(nuevo: String) {
+    estado = estado.copy(titulo = nuevo, error = null)
+}
+
+fun onContenidoChange(nuevo: String) {
+    estado = estado.copy(contenido = nuevo)
+}
+
+fun onGuardar() {
+    if (estado.guardando) return                    // ya guardando: ignorar
+    intentosGuardado++                              // desafío: cuenta TODOS los intentos
+    if (estado.titulo.isBlank()) {
+        estado = estado.copy(error = "El título no puede estar vacío")
+        return
+    }
+    estado = estado.copy(guardando = true, error = null)
+    viewModelScope.launch {
+        delay(1500)                                 // guardado SIMULADO
+        estado = estado.copy(guardando = false,
+                             guardada = Nota(estado.titulo, estado.contenido))
+    }
+}</pre>
+</div>
+<p>Son <strong>las mismas reglas</strong> que en el Ej 2 eran funciones sueltas (<code>alEditarTitulo</code>, <code>alPulsarGuardar</code>...). Se “mudaron” al ViewModel casi sin cambios.
+Por eso valió la pena separarlas en el Ej 2.</p>
+<div class="caja ojo">
+  <strong class="titulo"><code>viewModelScope</code> en vez de <code>rememberCoroutineScope</code></strong>
+  Las corrutinas lanzadas en <code>viewModelScope</code> viven lo que vive el ViewModel: si se rota <em>a mitad del guardado</em>, el guardado sigue y termina bien.
+  Con <code>rememberCoroutineScope</code> (Ej 2) se cancelaba junto con la pantalla. Si el ViewModel se destruye de verdad, sus corrutinas se cancelan solas.
+</div>
+
+<div class="bloque">
+<h3>Paso 3 · <code>onCleared()</code>: el final de la vida</h3>
+<pre>override fun onCleared() {
+    Log.d(TAG, "ViewModel DESTRUIDO")
+}</pre>
+<p>Android lo llama cuando el ViewModel se destruye <strong>definitivamente</strong> (por ejemplo, salir de la pantalla con “atrás”). <strong>No</strong> se llama al rotar.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 4 · Obtener el ViewModel: <code>by viewModels()</code></h3>
+<pre>class MainActivity : ComponentActivity() {
+    private val notaViewModel: NotaViewModel by viewModels()
+    ...
+        PantallaNotaConViewModel(viewModel = notaViewModel, ...)
+}</pre>
+</div>
+<ul>
+  <li><code>by viewModels()</code> <strong>no crea uno nuevo cada vez</strong>: le pide a Android “el ViewModel de esta pantalla”. La primera vez lo crea; si la Activity
+  se recrea (rotación), devuelve <strong>el mismo</strong>.</li>
+  <li>Es el “mecanismo apropiado del proyecto”: viene en <code>activity-ktx</code>, que ya estaba como dependencia de <code>activity-compose</code>. <strong>No hubo que agregar bibliotecas.</strong></li>
+</ul>
+<div class="caja ojo">
+  <strong class="titulo">Error típico: <code>val vm = NotaViewModel()</code></strong>
+  Crearlo “a mano” lo convierte en un objeto común: se crea uno nuevo en cada recreación (o peor, en cada recomposición si se hace dentro de un composable)
+  y el estado se pierde igual que con <code>remember</code>. La guía lo marca como propuesta a rechazar.
+</div>
+
+<div class="bloque">
+<h3>Paso 5 · La pantalla: <code>PantallaNota</code> se reutiliza SIN CAMBIOS</h3>
+<pre>@Composable
+fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        PantallaNota(
+            estado = viewModel.estado,                    // el estado BAJA
+            onTituloChange = viewModel::onTituloChange,   // los eventos SUBEN
+            onContenidoChange = viewModel::onContenidoChange,
+            onGuardar = viewModel::onGuardar
+        )
+        Text("Intentos de guardado: ${viewModel.intentosGuardado}")
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>PantallaNota</code> es exactamente la del Ej 2.</strong> Como era una View sin estado, no le importa quién es el dueño (antes un composable, ahora un ViewModel).
+  Este es el beneficio concreto del <em>state hoisting</em>.</li>
+  <li><strong><code>viewModel::onGuardar</code></strong> es una <em>referencia a función</em>: “pasá el método <code>onGuardar</code> de este objeto”.
+  Equivale a la lambda <code>{ viewModel.onGuardar() }</code>, pero más corta.</li>
+  <li><strong><code>verticalScroll</code></strong>: al rotar, en horizontal la pantalla no entra entera; sin scroll, la tarjeta y el contador quedaban fuera de vista.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 6 · Quién hace qué (criterio de finalización)</h3>
+<table>
+  <tr><th style="width:22%">Pieza</th><th>Hace</th><th style="width:34%">NO hace</th></tr>
+  <tr><td><span class="tag v">MainActivity</span></td><td>Obtiene el ViewModel y lo conecta con la pantalla.</td><td>✅ No valida notas.</td></tr>
+  <tr><td><span class="tag v">PantallaNota</span></td><td>Dibuja <code>estado</code>, avisa eventos.</td><td>No decide, no guarda.</td></tr>
+  <tr><td><span class="tag vm">NotaViewModel</span></td><td>Es dueño del estado, aplica reglas, coordina el guardado.</td><td>✅ No llama composables; no conoce la Activity.</td></tr>
+</table>
+</div>
+
+<h3>Experimentos realizados</h3>
+<table>
+  <tr><th style="width:34%">Prueba</th><th>Resultado observado</th></tr>
+  <tr><td>Rotar con <strong>Ej 2</strong> (<code>remember</code>)</td><td>Título y contenido <strong>se borran</strong>.</td></tr>
+  <tr><td>Rotar con <strong>Ej 3</strong> (ViewModel)</td><td>Se conservan título, contenido, nota guardada e <strong>intentos: 2</strong>. Logcat: <code>ViewModel CREADO</code> aparece <strong>una sola vez</strong> (rotando ida y vuelta).</td></tr>
+  <tr><td>App a segundo plano + <code>adb shell am kill</code> (Android mata el proceso) y volver</td><td>Pantalla <strong>vacía</strong>, intentos: 0. Logcat: un segundo <code>ViewModel CREADO</code> con <strong>otro</strong> identificador.</td></tr>
+</table>
+
+<div class="figs">
+  <figure><img src="img/ej03_proceso_muerto.png" style="height:230px"><br>Después de matar el proceso:<br>ViewModel nuevo, estado perdido</figure>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">¿Qué sobrevive a qué? (pregunta transversal de la guía)</strong>
+  <table style="margin:6px 0 0;background:#fff">
+    <tr><th></th><th>Recomposición</th><th>Rotación</th><th>Muerte del proceso</th></tr>
+    <tr><td><code>remember</code></td><td>✅</td><td>❌</td><td>❌</td></tr>
+    <tr><td><code>rememberSaveable</code></td><td>✅</td><td>✅</td><td>✅* (datos chicos)</td></tr>
+    <tr><td>ViewModel</td><td>✅</td><td>✅</td><td>❌</td></tr>
+    <tr><td>Repository + archivo / Room</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  </table>
+  <p style="font-size:9pt;margin:4px 0 0">* Solo si el proceso lo mató <em>Android</em> (falta de memoria); si el usuario cierra la app a propósito, también se pierde.</p>
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué problema resuelve el ViewModel?</strong><br>
+Dos cosas: (a) <strong>sobrevive a los cambios de configuración</strong> (rotación, idioma, modo oscuro): el estado de pantalla y las operaciones en curso no se pierden
+cuando Android recrea la Activity; (b) <strong>saca la lógica de la UI</strong>: las reglas quedan en una clase Kotlin que no dibuja ni conoce la Activity,
+y la pantalla solo muestra estado y avisa eventos.</p>
+<p><strong>2. ¿Qué sucederá si el proceso se elimina completamente?</strong><br>
+El ViewModel vive <strong>en memoria</strong>, dentro del proceso: si Android lo mata (por falta de memoria con la app en segundo plano) o el usuario
+la cierra, el ViewModel <strong>muere con él</strong> y al volver se crea uno nuevo, vacío. Se pierde todo (lo comprobamos). <strong>Un ViewModel no es persistencia.</strong>
+Para sobrevivir a eso: lo escrito a medias, con <code>SavedStateHandle</code>/<code>rememberSaveable</code>; los datos reales, con un Repository que guarde en
+archivo o Room (Ej 6 en adelante).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>El estado y las reglas se mudan del composable al <strong>ViewModel</strong>; <code>NotaUiState</code> y <code>PantallaNota</code> no cambian.</li>
+    <li>El ViewModel <strong>sobrevive a la rotación</strong> pero <strong>no a la muerte del proceso</strong>.</li>
+    <li>Se obtiene con <code>by viewModels()</code>, nunca con <code>NotaViewModel()</code> a mano.</li>
+    <li><code>private set</code>: la pantalla lee el estado pero no puede cambiarlo.</li>
+    <li><code>viewModelScope</code>: corrutinas que viven lo que vive el ViewModel.</li>
+  </ol>
 </div>
 
 </body>
