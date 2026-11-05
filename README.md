@@ -9,9 +9,45 @@ con **MVVM**, un **Repository** que lee y escribe archivos de texto, **Room**, y
 
 ## Cómo está organizado
 
-- **`main`**: proyecto base (plantilla *Empty Activity* de Compose) + apuntes completos.
+- **`main`**: proyecto base (plantilla *Empty Activity* de Compose, con el tema en `core/theme/`) + apuntes completos.
 - **Una rama por ejercicio**, cada una con **solo el código de su ejercicio** y su propio `README.md`.
   Cada rama sale de la anterior, así que la app evoluciona de una a la siguiente.
+
+## Estructura de carpetas
+
+El código se organiza **por capas**, igual que
+[PokedexAcademy-MVVM-Clean](https://github.com/ExBattou/PokedexAcademy-MVVM-Clean). Cada carpeta es un paquete de Kotlin
+y en cada rama aparecen solo las carpetas que ese ejercicio usa (cada README de rama muestra su árbol completo).
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt          # punto de entrada: aloja la UI
+ ├── MvvmLabApp.kt            # Application propia (desde el Ej 11)
+ ├── core/
+ │    ├── model/              # tipos comunes (EstadoCarga)
+ │    ├── navigation/         # Rutas de navegación (desde el Ej 12)
+ │    ├── theme/              # tema de Compose
+ │    └── util/               # utilidades (Fechas)
+ ├── data/                    # CÓMO se guardan los datos
+ │    ├── local/              # Room: Entity, DAO, Database (Ej 14–15)
+ │    ├── mapper/             # Entity ⇄ modelo de dominio
+ │    └── repository/         # implementaciones: memoria, archivos, Room
+ ├── domain/                  # QUÉ es la app: Kotlin puro, sin Android
+ │    ├── model/              # Nota, Registro, ResultadoLectura
+ │    ├── repository/         # contratos (interfaces)
+ │    └── validacion/         # reglas de negocio
+ ├── presentation/            # una carpeta por pantalla: UiState + ViewModel + Pantalla
+ └── di/                      # ContenedorApp: quién crea las dependencias (Ej 11)
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/validacion/       # tests de reglas
+ ├── fake/                    # Repository falsos
+ ├── presentation/            # tests de ViewModels
+ └── util/                    # MainDispatcherRule
+```
+
+> A diferencia del repo de referencia, no hay `domain/usecase/`: la guía pide no crear capas "porque sí" y en estos
+> ejercicios cada caso de uso solo delegaría en el Repository.
 
 ## Ramas
 
