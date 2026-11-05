@@ -1,58 +1,23 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.borrador
 
 import android.util.Log
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.data.repository.ArchivoTextoRepository
+import com.example.mvvmlab.data.repository.RepositorioQueFalla
+import com.example.mvvmlab.domain.model.ResultadoLectura
+import com.example.mvvmlab.domain.repository.BorradorRepository
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
-
-// =====================================================================
-// EJERCICIO 9 — Cargando, listo o fallo
-// =====================================================================
-// En vez de banderas sueltas (cargando=true, error!=null, ...) que se
-// pueden combinar de forma ambigua, cada operacion tiene un tipo SELLADO
-// con sus estados posibles. Un "when" sobre ellos es exhaustivo.
-// =====================================================================
-
-// Estado de la LECTURA inicial del borrador.
-sealed interface EstadoCarga {
-    data object Cargando : EstadoCarga
-    data object Listo : EstadoCarga
-    data class Error(val mensaje: String) : EstadoCarga
-}
-
-// Estado de la ultima operacion de GUARDADO.
-sealed interface EstadoGuardado {
-    data object Inactivo : EstadoGuardado          // todavia no se intento guardar
-    data object Guardando : EstadoGuardado
-    data object Guardado : EstadoGuardado          // SOLO despues de completar la escritura
-    data class Error(val mensaje: String) : EstadoGuardado
-}
-
-data class BorradorUiState(
-    val carga: EstadoCarga = EstadoCarga.Cargando,
-    val guardado: EstadoGuardado = EstadoGuardado.Inactivo,
-    val texto: String = "",
-    val textoGuardado: String = "",
-    val existeArchivo: Boolean = false
-) {
-    val hayCambiosSinGuardar: Boolean get() = texto != textoGuardado
-    val puedeEditar: Boolean get() = carga == EstadoCarga.Listo
-    val puedeGuardar: Boolean
-        get() = puedeEditar && hayCambiosSinGuardar && guardado != EstadoGuardado.Guardando
-}
 
 class BorradorViewModel(
     private val repositorio: BorradorRepository
@@ -139,17 +104,4 @@ class BorradorViewModel(
             }
         }
     }
-}
-
-@Composable
-fun PantallaBorradorConViewModel(viewModel: BorradorViewModel, modifier: Modifier = Modifier) {
-    val estado by viewModel.uiState.collectAsStateWithLifecycle()
-    PantallaBorrador(
-        estado = estado,
-        onTextoChange = viewModel::onTextoChange,
-        onGuardar = viewModel::onGuardar,
-        onDescartarCambios = viewModel::onDescartarCambios,
-        onReintentar = viewModel::onReintentar,
-        modifier = modifier
-    )
 }

@@ -24,6 +24,36 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── model/
+ │   │   ├── EstadoCarga.kt
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── ArchivoTextoRepository.kt
+ │   │   ├── RepositorioQueFalla.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── ResultadoLectura.kt
+ │   ├── repository/
+ │   │   ├── BorradorRepository.kt
+ ├── presentation/
+ │   ├── borrador/
+ │   │   ├── BorradorUiState.kt
+ │   │   ├── BorradorViewModel.kt
+ │   │   ├── PantallaBorrador.kt
+```
+
 ## Consigna
 
 Modelar un estado de carga y uno de error para lectura/escritura. `viewModelScope` para iniciar el trabajo y disco en IO.
@@ -34,10 +64,10 @@ controlada (sin tocar permisos). **Desafío:** Reintentar si la carga falla.
 
 | Archivo | Cambio |
 |---|---|
-| `BorradorViewModel.kt` | `sealed interface EstadoCarga` (Cargando/Listo/Error) y `EstadoGuardado` (Inactivo/Guardando/Guardado/Error); `try/catch (IOException)`; `onReintentar`; constante `USAR_REPOSITORIO_QUE_FALLA` en la fábrica |
-| `RepositorioQueFalla.kt` | **Nuevo**: implementación del contrato que falla a propósito (1ª lectura y toda escritura) con demora |
-| `PantallaBorrador.kt` | `when` exhaustivo: indicador de carga, tarjeta de error con Reintentar, mensaje de guardado |
-| `BorradorRepository.kt` | Sin cambios (ya despacha en `Dispatchers.IO`) |
+| `presentation/borrador/BorradorViewModel.kt` | `sealed interface EstadoCarga` (Cargando/Listo/Error) y `EstadoGuardado` (Inactivo/Guardando/Guardado/Error); `try/catch (IOException)`; `onReintentar`; constante `USAR_REPOSITORIO_QUE_FALLA` en la fábrica |
+| `data/repository/RepositorioQueFalla.kt` | **Nuevo**: implementación del contrato que falla a propósito (1ª lectura y toda escritura) con demora |
+| `presentation/borrador/PantallaBorrador.kt` | `when` exhaustivo: indicador de carga, tarjeta de error con Reintentar, mensaje de guardado |
+| `domain/repository/BorradorRepository.kt + data/repository/ArchivoTextoRepository.kt` | Sin cambios (ya despacha en `Dispatchers.IO`) |
 
 ## Pruebas (emulador)
 

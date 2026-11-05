@@ -1,7 +1,9 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.data.repository
 
-import kotlinx.coroutines.delay
+import com.example.mvvmlab.domain.model.ResultadoLectura
+import com.example.mvvmlab.domain.repository.BorradorRepository
 import java.io.IOException
+import kotlinx.coroutines.delay
 
 // =====================================================================
 // EJERCICIO 9 — Repository de PRUEBA que falla a proposito

@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.borrador
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,11 +17,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.core.theme.MvvmLabTheme
 
 @Composable
 fun PantallaBorrador(
@@ -125,4 +128,17 @@ fun BorradorErrorGuardarPreview() {
             {}, {}, {}, {}
         )
     }
+}
+
+@Composable
+fun PantallaBorradorConViewModel(viewModel: BorradorViewModel, modifier: Modifier = Modifier) {
+    val estado by viewModel.uiState.collectAsStateWithLifecycle()
+    PantallaBorrador(
+        estado = estado,
+        onTextoChange = viewModel::onTextoChange,
+        onGuardar = viewModel::onGuardar,
+        onDescartarCambios = viewModel::onDescartarCambios,
+        onReintentar = viewModel::onReintentar,
+        modifier = modifier
+    )
 }
