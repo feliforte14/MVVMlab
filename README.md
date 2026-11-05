@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 11: Dependencias, ¿quién crea el Repository?
+# MvvmLab — Ejercicio 12: Dos pantallas, una información
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -22,51 +22,51 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej08-guardar-archivo` | 8 — Guardar texto, cerrar y volver |
 | `ej09-carga-error` | 9 — Cargando, listo o falló |
 | `ej10-lista-persistente` | 10 — De un texto a una lista persistente |
-| **`ej11-dependencias`** | **11 — Dependencias: ¿quién crea el Repository?** ← esta rama |
+| `ej11-dependencias` | 11 — Dependencias: ¿quién crea el Repository? |
+| **`ej12-dos-pantallas`** | **12 — Dos pantallas, una información** ← esta rama |
 
 ---
 
 ## Consigna
 
-Revisar dónde se construyen el Repository y el ViewModel. Suministrar la dependencia desde la capa de aplicación
-(una fábrica explícita alcanza). El ViewModel recibe el contrato, no crea archivos con un Context de la UI.
-Justificar si se usa `AndroidViewModel`.
-**Desafío:** alternar entre Repository en memoria y de archivos con una única decisión de configuración.
+Separar la lista de notas y el detalle/editor. Al guardar desde el detalle, la lista debe mostrar lo actualizado al regresar.
+Una fuente de verdad en el Repository; definir cuándo refrescar o emitir cambios. Pasar un identificador por navegación,
+no objetos. **Desafío:** volver atrás con cambios sin guardar y decidir qué pregunta la interfaz.
 
 ## Archivos
 
-| Archivo | Cambio |
-|---|---|
-| `ContenedorApp.kt` | **Nuevo**: `enum OrigenDatos`, `ContenedorApp` (única decisión `origenDatos` + `notaRepository by lazy`) y `MvvmLabApp : Application` |
-| `NotaRepositoryEnMemoria.kt` | **Nuevo**: implementación en memoria del contrato (con `Mutex`) |
-| `NotasViewModel.kt` | La `Factory` pide `app.contenedor.notaRepository` en vez de construirlo |
-| `AndroidManifest.xml` | `android:name=".MvvmLabApp"` |
+| Archivo | Capa | Contenido |
+|---|---|---|
+| `NotaRepository.kt` | Datos | Contrato con `observarTodas(): Flow` + `obtener(id)`; `ArchivoNotasRepository` emite tras cada escritura |
+| `NotaRepositoryEnMemoria.kt` | Datos | Misma API con `MutableStateFlow` |
+| `ContenedorApp.kt` | App | Sin cambios (una instancia compartida) |
+| `ListaNotasViewModel.kt` | ViewModel | Observa (`collect`) el Flow; eliminar sin recargar |
+| `DetalleNotaViewModel.kt` | ViewModel | Recibe el `id` por `SavedStateHandle`; carga, valida y guarda |
+| `Pantallas.kt` | View | `PantallaLista` (FAB +) y `PantallaDetalle` (diálogo "¿Descartar cambios?") |
+| `NavegacionApp.kt` | Navegación | `NavHost`: `"lista"` y `"detalle/{id}"` |
+| `libs.versions.toml`, `app/build.gradle.kts` | — | `navigation-compose 2.9.0`, `lifecycle-viewmodel-compose 2.10.0` |
 
-```
-MvvmLabApp (Application, 1 vez)
-  └─ ContenedorApp ── origenDatos = ARCHIVO
-        └─ notaRepository (by lazy, UNA instancia) : NotaRepository
-              └─ NotasViewModel.Factory ──► NotasViewModel(repositorio)
-```
+## Decisiones
 
-No se usa `AndroidViewModel`: el ViewModel no necesita Context; solo necesitaba el Repository, y ahora lo recibe armado.
+- **Cuándo emitir:** el Repository actualiza su `StateFlow` después de escribir en disco con éxito → ambas pantallas ven lo mismo.
+- **Navegación:** `detalle/{id}` (o `detalle/nueva`). Solo el id; el detalle pide la versión vigente al Repository.
+- **Atrás con cambios:** diálogo "¿Descartar cambios?" (Descartar / Seguir editando) vía `BackHandler`; sin cambios, vuelve directo.
 
 ## Pruebas (emulador)
 
-| Configuración | Resultado |
+| Prueba | Resultado |
 |---|---|
-| `ARCHIVO` | Notas de `notas.json` ✅ |
-| `MEMORIA` (una línea) | Sin notas; se agrega una ✅ |
-| `MEMORIA` + reiniciar | Vacío (memoria perdida) ✅ |
-| `ARCHIVO` de nuevo | Notas del archivo intactas ✅ |
+| Editar → atrás | Diálogo; "Seguir editando" conserva el texto ✅ |
+| Guardar | Vuelve y la lista muestra lo editado ✅ |
+| "+" → nueva → Guardar | Aparece en la lista ✅ |
+| `force-stop` y reabrir | Persistido ✅ |
 
 ## Preguntas de la guía
 
-**¿Qué se ganaría al reemplazar el Repository sin tocar el ViewModel?** La lógica del ViewModel queda estable aunque cambie el
-almacenamiento (memoria, archivo, Room, red, falso para tests).
+**¿Qué ocurre si las dos pantallas guardan una copia distinta de la lista?** Se contradicen o una pisa a la otra. Por eso ambas
+observan el Repository.
 
-**¿Qué instancia debe compartir la app?** Una sola instancia de cada Repository: con varias, en memoria cada una tendría su lista;
-con archivo cada una tendría su Mutex y las escrituras podrían pisarse.
+**¿Qué dato tiene sentido recordar sólo en la navegación?** El id de la nota abierta (y la pila de pantallas), no su contenido.
 
 ## Criterio de finalización
-- ✅ El origen de datos se elige en un punto identificable (`ContenedorApp.origenDatos`) y no en cada recomposición.
+- ✅ Después de editar una nota no aparecen versiones contradictorias entre las dos pantallas.

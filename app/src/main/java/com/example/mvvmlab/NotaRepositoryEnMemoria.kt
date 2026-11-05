@@ -1,25 +1,28 @@
 package com.example.mvvmlab
 
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
-// Implementacion en memoria del MISMO contrato que ArchivoNotasRepository.
-// Los datos se pierden al cerrar la app. Se elige desde ContenedorApp.
+// Implementacion en memoria del MISMO contrato. Los datos se pierden al
+// cerrar la app. Se elige desde ContenedorApp.
 class NotaRepositoryEnMemoria : NotaRepository {
 
-    private val notas = mutableListOf<Nota>()
-    private val mutex = Mutex()
+    private val notas = MutableStateFlow<List<Nota>>(emptyList())
 
-    override suspend fun obtenerTodas(): List<Nota> = mutex.withLock { notas.toList() }
+    override fun observarTodas(): Flow<List<Nota>> = notas.asStateFlow()
+
+    override suspend fun obtener(id: String): Nota? = notas.value.find { it.id == id }
 
     override suspend fun guardar(nota: Nota) {
-        mutex.withLock {
-            val i = notas.indexOfFirst { it.id == nota.id }
-            if (i >= 0) notas[i] = nota else notas.add(nota)
+        notas.update { lista ->
+            if (lista.any { it.id == nota.id }) lista.map { if (it.id == nota.id) nota else it }
+            else lista + nota
         }
     }
 
     override suspend fun eliminar(id: String) {
-        mutex.withLock { notas.removeAll { it.id == id } }
+        notas.update { lista -> lista.filterNot { it.id == id } }
     }
 }

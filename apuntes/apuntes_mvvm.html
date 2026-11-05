@@ -1624,5 +1624,152 @@ escrituras simultáneas podrían pisarse. Una instancia = una fuente de verdad. 
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 12 — Dos pantallas, una información</h2>
+<p><strong>Consigna:</strong> separar la lista de notas y el detalle/editor. Al guardar desde el detalle, la lista debe mostrar lo actualizado al regresar.
+Mantener una fuente de verdad en el Repository y definir cuándo refrescar o emitir cambios. No pasar objetos gigantes como argumentos de navegación;
+pasar un identificador. <strong>Desafío:</strong> volver atrás con cambios sin guardar y decidir qué debería preguntar la interfaz.
+<br>Rama: <code>ej12-dos-pantallas</code> · Archivos: <code>NotaRepository.kt</code>, <code>ListaNotasViewModel.kt</code>, <code>DetalleNotaViewModel.kt</code>,
+<code>Pantallas.kt</code>, <code>NavegacionApp.kt</code></p>
+
+<h3>Paso 0 · El problema de las dos copias</h3>
+<p>Con el contrato del Ej 6 (<code>obtenerTodas()</code>, una “foto”), la lista pediría su foto al abrirse, el detalle guardaría una nota… y al volver,
+la lista seguiría mostrando su foto vieja. Habría <strong>dos versiones contradictorias</strong>. Solución: una sola fuente de verdad (el Repository) que
+<strong>emite</strong> cada cambio.</p>
+
+<div class="bloque">
+<h3>Paso 1 · El contrato pasa a <code>Flow</code> (decisión del Ej 6, revisada)</h3>
+<pre>interface NotaRepository {
+    fun observarTodas(): Flow&lt;List&lt;Nota&gt;&gt;    // emite la lista actual y cada cambio
+    suspend fun obtener(id: String): Nota?    // una nota puntual (para el detalle)
+    suspend fun guardar(nota: Nota)
+    suspend fun eliminar(id: String)
+}</pre>
+</div>
+<p>En el Ej 6 se dijo: “Flow conviene cuando varias pantallas miran los mismos datos”. Ahora es el caso. <code>observarTodas</code> <strong>no</strong> es
+<code>suspend</code>: devuelve un flujo al que uno se suscribe.</p>
+
+<div class="bloque">
+<h3>Paso 2 · Implementación: un <code>MutableStateFlow</code> como espejo del disco</h3>
+<pre>private val notas = MutableStateFlow&lt;List&lt;Nota&gt;?&gt;(null)        // null = todavía no se leyó
+
+override fun observarTodas() = notas.onStart { cargarSiHaceFalta() }.filterNotNull()
+
+override suspend fun guardar(nota: Nota) = mutex.withLock {
+    val lista = ...                    // leer-modificar (igual que el Ej 10)
+    escribirArchivo(lista)             // 1. primero disco (temporal + renombrado)
+    notas.value = lista                // 2. después se EMITE a todos los que observan
+}</pre>
+</div>
+<ul>
+  <li><strong>Cuándo se emite:</strong> después de cada escritura exitosa. Si la escritura falla, no se emite nada: lo que se ve sigue siendo lo que hay en disco.</li>
+  <li><code>onStart { }</code> lee el archivo la primera vez que alguien observa. Si falla, el Flow termina con la excepción y el ViewModel muestra el error.</li>
+  <li><code>filterNotNull()</code> no deja pasar el <code>null</code> inicial.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Un ViewModel por pantalla</h3>
+<pre>class ListaNotasViewModel(repositorio: NotaRepository) : ViewModel() {
+    init {
+        viewModelScope.launch {
+            repositorio.observarTodas().collect { notas -&gt;            // se queda escuchando
+                _uiState.update { it.copy(carga = EstadoCarga.Listo, notas = notas) }
+            }
+        }
+    }
+    fun onEliminar(id: String) { viewModelScope.launch { repositorio.eliminar(id) } }  // no recarga: el Flow emite
+}
+
+class DetalleNotaViewModel(repositorio: NotaRepository, savedStateHandle: SavedStateHandle) : ViewModel() {
+    private val id: String? = savedStateHandle.get&lt;String&gt;("id")?.takeIf { it != "nueva" }
+    init { /* si hay id: repositorio.obtener(id) y lo copia al formulario */ }
+    fun onGuardar() { /* valida, repositorio.guardar(...), guardadoOk = true */ }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>collect</code></strong>: suscripción. El bloque se ejecuta con cada emisión: al volver del detalle, la lista ya tiene lo guardado.</li>
+  <li><strong><code>SavedStateHandle</code></strong>: trae los argumentos de navegación (<code>"id"</code>). Se obtiene en la fábrica con <code>createSavedStateHandle()</code>.</li>
+  <li>Ambos ViewModels reciben <strong>la misma instancia</strong> de Repository del contenedor (Ej 11): por eso hay una sola fuente de verdad.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 4 · Navegación: se pasa solo el id</h3>
+<pre>NavHost(navController = nav, startDestination = "lista") {
+    composable("lista") {
+        val vm: ListaNotasViewModel = viewModel(factory = ListaNotasViewModel.Factory)
+        PantallaLista(..., onAbrir = { id -&gt; nav.navigate("detalle/$id") },
+                           onNueva = { nav.navigate("detalle/nueva") })
+    }
+    composable("detalle/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) {
+        val vm: DetalleNotaViewModel = viewModel(factory = DetalleNotaViewModel.Factory)
+        PantallaDetalle(..., onVolver = { nav.popBackStack() })
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong>Ruta con argumento</strong>: <code>"detalle/{id}"</code>; <code>"nueva"</code> es un id especial para crear.</li>
+  <li><strong>Solo el id, no el objeto <code>Nota</code></strong>: los argumentos de navegación se guardan en el estado de la Activity (tienen límite de tamaño), y un
+  objeto copiado quedaría desactualizado. Con el id, el detalle le pide la versión vigente al Repository.</li>
+  <li><code>viewModel(factory = ...)</code> dentro de <code>composable { }</code> asocia el ViewModel a <strong>esa entrada</strong> de navegación: se destruye al salir de ella.</li>
+  <li><code>popBackStack()</code> = volver a la pantalla anterior.</li>
+</ul>
+<div class="caja ojo">
+  <strong class="titulo">Dependencias agregadas (justificadas)</strong>
+  <code>navigation-compose 2.9.0</code> (navegación entre destinos con argumentos y pila de pantallas) y <code>lifecycle-viewmodel-compose 2.10.0</code>
+  (la función <code>viewModel()</code> en Compose; misma versión de lifecycle del proyecto). Sin ellas habría que reimplementar a mano la pila de pantallas,
+  el botón atrás y el alcance de cada ViewModel.
+</div>
+
+<div class="bloque">
+<h3>Paso 5 · Desafío: volver con cambios sin guardar</h3>
+<pre>var preguntarDescartar by rememberSaveable { mutableStateOf(false) }      // estado VISUAL local
+BackHandler(enabled = estado.hayCambiosSinGuardar) { preguntarDescartar = true }
+LaunchedEffect(estado.guardadoOk) { if (estado.guardadoOk) onVolver() }    // guardó → volver
+
+if (preguntarDescartar) AlertDialog(
+    title = { Text("¿Descartar cambios?") },
+    confirmButton = { TextButton({ preguntarDescartar = false; onVolver() }) { Text("Descartar") } },
+    dismissButton = { TextButton({ preguntarDescartar = false }) { Text("Seguir editando") } })</pre>
+</div>
+<ul>
+  <li><strong>Decisión:</strong> si hay cambios, preguntar “¿Descartar cambios?” con dos opciones claras (Descartar / Seguir editando). Si no hay cambios, volver directo
+  (preguntar siempre molesta). El botón “← Volver” de la barra hace lo mismo que el atrás del sistema.</li>
+  <li><strong><code>BackHandler</code></strong> intercepta el botón atrás del sistema solo cuando <code>enabled</code> es verdadero.</li>
+  <li><strong>Si el diálogo está abierto</strong> es estado visual de esta pantalla, no del negocio: vive en la UI con <code>rememberSaveable</code> (sobrevive a la rotación).</li>
+  <li><strong><code>LaunchedEffect</code></strong> ejecuta un efecto (navegar) cuando cambia <code>guardadoOk</code>: el ViewModel no navega, solo informa que terminó.</li>
+</ul>
+
+<div class="figs">
+  <figure><img src="img/ej12_dialogo.png" style="height:250px"><br>Atrás con cambios sin guardar</figure>
+  <figure><img src="img/ej12_lista.png" style="height:250px"><br>Lista actualizada al volver<br>(edición + nota nueva)</figure>
+</div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:46%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Abrir “Compras”, agregar “ cocido”</td><td>Aparece “● Cambios sin guardar” ✅</td></tr>
+  <tr><td>Botón atrás del sistema</td><td>Diálogo “¿Descartar cambios?” ✅ → “Seguir editando” conserva el texto ✅</td></tr>
+  <tr><td>Guardar</td><td>Vuelve a la lista, que ya muestra “...y mate cocido” ✅</td></tr>
+  <tr><td>“+” → nota “Tercera” → Guardar</td><td>“3 notas” en la lista ✅</td></tr>
+  <tr><td><code>force-stop</code> y reabrir</td><td>“3 notas” (persistido en <code>notas.json</code>) ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué ocurre si las dos pantallas guardan una copia distinta de la lista?</strong><br>
+Se contradicen: la lista muestra datos viejos después de editar, o una pantalla guarda sobre una versión desactualizada y <em>pisa</em> lo que guardó la otra.
+Por eso ninguna pantalla es dueña de la lista: ambas leen del Repository (una instancia, un <code>StateFlow</code>), que emite cada cambio.</p>
+<p><strong>2. ¿Qué dato tiene sentido recordar sólo en la navegación?</strong><br>
+El <strong>identificador</strong> de la nota que se está viendo (<code>detalle/{id}</code>): es lo mínimo para saber “qué pantalla y sobre qué nota”, y es lo que
+Android restaura si recrea la pila. También qué pantalla está abierta (la pila). El contenido de la nota no: vive en el Repository.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Una fuente de verdad: el Repository emite (<code>Flow</code>) después de cada escritura exitosa.</li>
+    <li>Un ViewModel por pantalla, ambos con la misma instancia de Repository.</li>
+    <li>Navegación con <code>detalle/{id}</code>: solo el id; el detalle pide la nota vigente.</li>
+    <li>Atrás con cambios → “¿Descartar cambios?”; el estado del diálogo es visual y local.</li>
+  </ol>
+</div>
+
 </body>
 </html>
