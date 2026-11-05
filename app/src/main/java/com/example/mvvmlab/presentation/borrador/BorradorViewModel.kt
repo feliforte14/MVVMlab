@@ -1,35 +1,21 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.borrador
 
 import android.util.Log
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.mvvmlab.data.repository.ArchivoTextoRepository
+import com.example.mvvmlab.domain.model.ResultadoLectura
+import com.example.mvvmlab.domain.repository.BorradorRepository
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
-
-// --- ESTADO DE PANTALLA -----------------------------------------------
-data class BorradorUiState(
-    val texto: String = "",            // lo que esta en el editor AHORA (estado del ViewModel)
-    val textoGuardado: String = "",    // lo que hay en DISCO segun la ultima lectura/escritura
-    val guardando: Boolean = false,
-    val mensaje: String = "Leyendo borrador...",
-    val error: String? = null
-) {
-    // Ej 8: distinguir visualmente un borrador sin guardar.
-    // Calculado: el editor difiere de lo que hay en disco.
-    val hayCambiosSinGuardar: Boolean get() = texto != textoGuardado
-}
 
 // --- VIEWMODEL --------------------------------------------------------
 class BorradorViewModel(
@@ -105,17 +91,4 @@ class BorradorViewModel(
             }
         }
     }
-}
-
-// --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
-@Composable
-fun PantallaBorradorConViewModel(viewModel: BorradorViewModel, modifier: Modifier = Modifier) {
-    val estado by viewModel.uiState.collectAsStateWithLifecycle()
-    PantallaBorrador(
-        estado = estado,
-        onTextoChange = viewModel::onTextoChange,
-        onGuardar = viewModel::onGuardar,
-        onDescartarCambios = viewModel::onDescartarCambios,
-        modifier = modifier
-    )
 }

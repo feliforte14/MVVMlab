@@ -23,6 +23,33 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── ArchivoTextoRepository.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── ResultadoLectura.kt
+ │   ├── repository/
+ │   │   ├── BorradorRepository.kt
+ ├── presentation/
+ │   ├── borrador/
+ │   │   ├── BorradorUiState.kt
+ │   │   ├── BorradorViewModel.kt
+ │   │   ├── PantallaBorrador.kt
+```
+
 ## Consigna
 
 Agregar al Repository la escritura del borrador en UTF-8. Escribir varias líneas, guardar, cerrar completamente la app y
@@ -33,9 +60,9 @@ volver a abrirla: debe recuperarse el contenido. Documentar si se sobrescribe o 
 
 | Archivo | Cambio |
 |---|---|
-| `BorradorRepository.kt` | `guardar(texto)` en el contrato; `ArchivoTextoRepository` usa `writeText(texto, UTF_8)` en `Dispatchers.IO` |
-| `BorradorViewModel.kt` | `textoGuardado` + `hayCambiosSinGuardar`; `onGuardar` y `onDescartarCambios` |
-| `PantallaBorrador.kt` | Chip "● Sin guardar" / "✓ Guardado", botones Guardar y Descartar cambios |
+| `domain/repository/BorradorRepository.kt + data/repository/ArchivoTextoRepository.kt` | `guardar(texto)` en el contrato; `ArchivoTextoRepository` usa `writeText(texto, UTF_8)` en `Dispatchers.IO` |
+| `presentation/borrador/BorradorViewModel.kt` | `textoGuardado` + `hayCambiosSinGuardar`; `onGuardar` y `onDescartarCambios` |
+| `presentation/borrador/PantallaBorrador.kt` | Chip "● Sin guardar" / "✓ Guardado", botones Guardar y Descartar cambios |
 
 ## Decisión documentada: sobrescribir
 
