@@ -3,13 +3,38 @@
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
 
-📄 Apuntes del ejercicio: [`apuntes/Apuntes_MVVM.pdf`](apuntes/Apuntes_MVVM.pdf)
+📄 Apuntes (teoría + resolución de los ejercicios hasta este): [`apuntes/Apuntes_MVVM.pdf`](apuntes/Apuntes_MVVM.pdf)
 
 ## Ramas
 
-Cada rama contiene **solo el código de su ejercicio**. Ver la tabla completa en `main`.
+Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una rama a la siguiente).
+
+| Rama | Ejercicio |
+|---|---|
+| `main` | Proyecto base (Empty Activity Compose) |
+| **`ej01-responsabilidades`** | **1 — ¿Quién está haciendo demasiado?** ← esta rama |
 
 ---
+
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── presentation/
+ │   ├── tareas/
+ │   │   ├── PantallaTareas.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── ExampleUnitTest.kt
+```
 
 ## Consigna
 
