@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 14: Room y archivo no son lo mismo
+# MvvmLab — Ejercicio 15: Integrador, Cuaderno de campo
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -25,56 +25,84 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej11-dependencias` | 11 — Dependencias: ¿quién crea el Repository? |
 | `ej12-dos-pantallas` | 12 — Dos pantallas, una información |
 | `ej13-tests` | 13 — Probar el ViewModel sin Android ni archivos |
-| **`ej14-room`** | **14 — Room y archivo no son lo mismo** ← esta rama |
+| `ej14-room` | 14 — Room y archivo no son lo mismo |
+| **`ej15-cuaderno-de-campo`** | **15 — Integrador: Cuaderno de campo** ← esta rama |
 
 ---
 
 ## Consigna
 
-Crear un adaptador del contrato de notas que use un DAO de Room. Compararlo con el Repository de archivo. Mantener un archivo
-de texto para un borrador exportable, sin duplicar toda la base. **Desafío:** tabla con tres decisiones de almacenamiento.
+App para guardar observaciones breves de una salida, recorrido, visita o actividad. Cada registro tiene id, título,
+descripción, fecha y favorito. Lista, edición, búsqueda por título y manejo claro de estados vacíos o errores.
+Registros en **Room** detrás de un contrato; bitácora libre en **`bitacora.txt`**; resumen en **`resumen.txt`**.
 
-## Archivos
+## Etapa 1 — Responsabilidades
 
-| Archivo | Contenido |
+```
+Compose (PantallaLista / PantallaEditar / PantallaBitacora)   ← dibuja y avisa
+   │ eventos ↑                              estado ↓ (StateFlow)
+ViewModels (ListaRegistrosVM / EditarRegistroVM / BitacoraVM) ← reglas y estados
+   │ contratos
+RegistroRepository ─► RoomRegistroRepository ─► RegistroDao ─► cuaderno.db
+BitacoraRepository ─► ArchivoBitacoraRepository ────────────► bitacora.txt
+GeneradorResumen   ─► ArchivoResumen ───────────────────────► resumen.txt
+                       (armado por ContenedorApp en MvvmLabApp)
+```
+
+| Capa | Archivos |
 |---|---|
-| `RoomNotaRepository.kt` | **Nuevo**: `NotaEntity`, `NotaDao` (Flow, `@Upsert`, búsqueda `LIKE`), `AppDatabase`, `RoomNotaRepository` (adaptador + traducción `SQLiteException` → `IOException`), `aDominio()` / `aEntity()` |
-| `ExportadorNotas.kt` | **Nuevo**: `fun interface ExportadorNotas` + `ArchivoExportadorNotas` → `notas_exportadas.txt` |
-| `ContenedorApp.kt` | `OrigenDatos.ROOM` (elegido), `AppDatabase` única (`by lazy`), `exportadorNotas` |
-| `ListaNotasViewModel.kt`, `Pantallas.kt`, `NavegacionApp.kt` | Botón "Exportar .txt" y mensaje |
-| Gradle | Plugin KSP `2.3.13`; Room `2.8.5` (`runtime`, `ktx`, `compiler`) |
+| View (Compose) | `PantallaLista.kt`, `PantallaEditar.kt`, `PantallaBitacora.kt`, `NavegacionApp.kt` |
+| ViewModel | `ViewModels.kt` (Lista, Editar, Bitácora), `ValidadorRegistro.kt` |
+| Contratos y modelo | `Modelo.kt` (`Registro`, `RegistroRepository`, `BitacoraRepository`, `GeneradorResumen`, `Fechas`) |
+| Room | `RegistroRoom.kt` (Entity, DAO con búsqueda `LIKE`, Database, adaptador) |
+| Archivos | `ArchivosCuaderno.kt` (bitácora, resumen, falla controlada) |
+| Dependencias | `ContenedorApp.kt` |
+| Tests | `app/src/test/.../CuadernoTest.kt` (11), `FakeRegistroRepository.kt`, `MainDispatcherRule.kt` |
 
-`DetalleNotaViewModel`, `PantallaDetalle` y los tests de ViewModels **no cambiaron** (mismo contrato).
+## Etapas 2 y 3 — Las dos persistencias
 
-## Archivo vs. Room
+- **Registros → Room** (única fuente de verdad): alta, lectura, edición, baja, favorito; el ViewModel observa el `Flow`
+  (búsqueda con `flatMapLatest`), nunca consulta el DAO desde Compose. Orden: favoritos primero, después más recientes.
+- **`bitacora.txt`**: texto libre del usuario, UTF-8 (párrafos y tildes), se guarda al tocar Guardar (temporal + renombrado).
+- **`resumen.txt`**: generado desde **todos** los registros, **solo a pedido** ("Generar resumen" / "Compartir"). Si falla la
+  escritura: error en pantalla, Room intacto y el resumen anterior completo. Nunca se relee.
 
-| | Archivo `notas.json` | Room |
+## Etapa 4 — Experimentos (emulador)
+
+| Experimento | Resultado |
+|---|---|
+| Cerrar y reabrir | Registros intactos ✅ |
+| Rotar mientras se escribe | Título y descripción intactos ✅ |
+| Guardar con título vacío | Errores debajo de cada campo, no guarda ✅ |
+| Falla controlada (`simularFallaEnRegistros = true`) | "No se pudo marcar como favorito" / "No se pudo guardar. Tus datos siguen en pantalla." ✅ |
+| Editar y regresar a la lista | La lista ya muestra el cambio ✅ |
+| Verificar archivos y base | `databases/cuaderno.db`, `files/bitacora.txt`, `files/resumen.txt` ✅ |
+
+## Etapa 5 — Tabla de cinco pruebas
+
+| # | Prueba | Resultado observado |
 |---|---|---|
-| Consultas | Leer todo y filtrar en Kotlin | SQL (`WHERE`, `LIKE`, `ORDER BY`) verificado al compilar |
-| Escritura | Reescribe todo (temporal + renombrado) | Por fila, transaccional |
-| Errores | `IOException`, JSON inválido, concurrencia a mano | `SQLiteException`, migraciones; SQL inválido no compila |
-| Actualizar la UI | `StateFlow` emitido a mano | `Flow` del DAO, automático |
+| 1 | Alta de 3 registros (1 favorito) → cerrar y reabrir | Persisten; favorito primero ✅ |
+| 2 | Buscar "feria" / "feriax" | 1 resultado / "Ningún registro coincide…" ✅ |
+| 3 | Bitácora con tildes, ñ y párrafos → Guardar | `bitacora.txt` idéntico ✅ |
+| 4 | Generar resumen con búsqueda activa / Compartir | `resumen.txt` con los 3 registros; abre el selector ✅ |
+| 5 | `CuadernoTest` (JVM) | 11/11 ✅ |
 
-## Tres decisiones de almacenamiento (desafío)
+**Desafío (Intent):** `ACTION_SEND` con `EXTRA_TEXT` = contenido del resumen; no se expone la ruta interna.
 
-| Dato | Dónde | Por qué |
-|---|---|---|
-| Notas (registros) | **Room** | Se buscan, ordenan y editan de a uno; la UI se entera de cada cambio; no se corrompen a medias |
-| Resumen para compartir | **Archivo .txt** | Texto libre para personas, generado desde la base, nunca se relee: no es fuente de verdad |
-| Lo que se está escribiendo | **ViewModel** | Estado de pantalla; se persiste al pulsar Guardar |
-
-## Pruebas
-
-Crear 2 notas ✅ · editar → la lista se actualiza sola y reordena ✅ · Exportar .txt ✅ · reabrir ✅ · tests 14/14 ✅
+**Decisión que cambiaría si el proyecto creciera:** búsqueda con FTS de Room y normalización de tildes (hoy `LIKE` recorre
+toda la tabla y "rio" no encuentra "río"); Hilt en vez del contenedor manual; migraciones de Room.
 
 ## Preguntas de la guía
 
-**¿Quién transforma Entity en modelo de dominio?** El adaptador `RoomNotaRepository` (`aDominio()` / `aEntity()`).
+**¿Cuál es la fuente de verdad de los registros?** La tabla `registros` de Room, vía `RegistroRepository`.
 
-**¿Qué gana el ViewModel al no conocer SQL?** No cambia si cambia la base, se prueba con un fake y habla el idioma del problema.
+**¿La bitácora libre y el resumen cumplen el mismo papel?** No: la bitácora es un dato original del usuario; el resumen es
+derivado y regenerable desde Room.
 
-**¿Qué sucede si hay dos fuentes de verdad sin política clara?** Se desincronizan. Política: Room es la única fuente de verdad;
-el txt es exportación de solo salida.
+**¿Qué sobreviviría a la eliminación del proceso?** Registros, `bitacora.txt` y `resumen.txt` (disco). No: lo escrito sin
+guardar, la búsqueda, mensajes y diálogos (memoria).
 
 ## Criterio de finalización
-- ✅ La misma pantalla funciona con el contrato de Repository y se explica qué datos van a Room y cuáles a archivo.
+- ✅ Flujo completo de registros y bitácora, cerrar y reabrir sin pérdida, y cada parte del código ubicada en View,
+  ViewModel, Repository, Room o archivos.

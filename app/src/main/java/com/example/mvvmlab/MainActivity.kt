@@ -12,9 +12,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MvvmLabTheme {
-                // Ej 12: la Activity solo aloja la navegacion. Cada pantalla
+                // Ej 15: la Activity solo aloja la navegacion. Cada pantalla
                 // obtiene su ViewModel dentro de su destino (NavegacionApp.kt).
-                AppNotas()
+                AppCuaderno()
             }
         }
     }

@@ -10,50 +10,58 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-// =====================================================================
-// EJERCICIO 12 — Navegacion entre las dos pantallas
-// =====================================================================
-// Rutas:
-//   "lista"          -> PantallaLista
-//   "detalle/{id}"   -> PantallaDetalle. {id} es el id de la nota o
-//                       "nueva". Se pasa SOLO el identificador, nunca el
-//                       objeto Nota entero: el detalle se la pide al
-//                       Repository y asi edita la version vigente.
-//
-// Cada destino tiene SU ViewModel: viewModel(...) dentro de composable{}
-// lo asocia a esa entrada de navegacion (vive mientras la pantalla este
-// en la pila y se destruye al salir de ella).
-// =====================================================================
+// Rutas: "lista" · "editar/{id}" (id o "nuevo") · "bitacora"
+// Cada destino obtiene SU ViewModel; todos comparten las mismas
+// instancias de Repository (ContenedorApp).
 @Composable
-fun AppNotas() {
+fun AppCuaderno() {
     val nav = rememberNavController()
 
     NavHost(navController = nav, startDestination = "lista") {
 
         composable("lista") {
-            val vm: ListaNotasViewModel = viewModel(factory = ListaNotasViewModel.Factory)
+            val vm: ListaRegistrosViewModel = viewModel(factory = ListaRegistrosViewModel.Factory)
             val estado by vm.uiState.collectAsStateWithLifecycle()
             PantallaLista(
                 estado = estado,
-                onAbrir = { id -> nav.navigate("detalle/$id") },
-                onNueva = { nav.navigate("detalle/${DetalleNotaViewModel.ID_NUEVA}") },
+                onBusquedaChange = vm::onBusquedaChange,
+                onAbrir = { id -> nav.navigate("editar/$id") },
+                onNuevo = { nav.navigate("editar/${EditarRegistroViewModel.ID_NUEVO}") },
+                onFavorito = vm::onFavorito,
                 onEliminar = vm::onEliminar,
-                onReintentar = vm::onReintentar,
-                onExportar = vm::onExportar
+                onGenerarResumen = vm::onGenerarResumen,
+                onCompartido = vm::onCompartido,
+                onBitacora = { nav.navigate("bitacora") },
+                onReintentar = vm::onReintentar
             )
         }
 
         composable(
-            route = "detalle/{${DetalleNotaViewModel.ARG_ID}}",
-            arguments = listOf(navArgument(DetalleNotaViewModel.ARG_ID) { type = NavType.StringType })
+            "editar/{${EditarRegistroViewModel.ARG_ID}}",
+            arguments = listOf(navArgument(EditarRegistroViewModel.ARG_ID) { type = NavType.StringType })
         ) {
-            val vm: DetalleNotaViewModel = viewModel(factory = DetalleNotaViewModel.Factory)
+            val vm: EditarRegistroViewModel = viewModel(factory = EditarRegistroViewModel.Factory)
             val estado by vm.uiState.collectAsStateWithLifecycle()
-            PantallaDetalle(
+            PantallaEditar(
                 estado = estado,
                 onTituloChange = vm::onTituloChange,
-                onContenidoChange = vm::onContenidoChange,
+                onDescripcionChange = vm::onDescripcionChange,
+                onFechaChange = vm::onFechaChange,
+                onFavoritoChange = vm::onFavoritoChange,
                 onGuardar = vm::onGuardar,
+                onVolver = { nav.popBackStack() }
+            )
+        }
+
+        composable("bitacora") {
+            val vm: BitacoraViewModel = viewModel(factory = BitacoraViewModel.Factory)
+            val estado by vm.uiState.collectAsStateWithLifecycle()
+            PantallaBitacora(
+                estado = estado,
+                onTextoChange = vm::onTextoChange,
+                onGuardar = vm::onGuardar,
+                onDescartar = vm::onDescartar,
+                onReintentar = vm::onReintentar,
                 onVolver = { nav.popBackStack() }
             )
         }

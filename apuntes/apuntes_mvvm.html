@@ -21,7 +21,7 @@
   th { background: var(--azul-claro); }
   code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f2f4f8; padding: 0 3px; border-radius: 3px; }
   pre { font-family: "SF Mono", Menlo, monospace; font-size: 8.4pt; background: #f6f7fa; border: 1px solid var(--borde);
-        border-radius: 6px; padding: 9px 11px; overflow-x: auto; white-space: pre; page-break-inside: avoid; margin: 8px 0; }
+        border-radius: 6px; padding: 9px 11px; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; page-break-inside: avoid; margin: 8px 0; }
   .caja { border-radius: 6px; padding: 8px 12px; margin: 10px 0; page-break-inside: avoid; }
   .clave { background: var(--azul-claro); border-left: 4px solid var(--azul); }
   .regla { background: var(--verde-claro); border-left: 4px solid var(--verde); }
@@ -2043,6 +2043,155 @@ otra al sincronizar). Por eso la política: <strong>Room es la única fuente de 
     <li>Room: consultas SQL verificadas, escrituras por fila, Flow automático.</li>
     <li>Archivo de texto solo para lo que es texto: un resumen exportable, no una copia de la base.</li>
   </ol>
+</div>
+
+<h2 class="salto">Ejercicio 15 — Integrador: Cuaderno de campo</h2>
+<p><strong>Consigna:</strong> app para guardar observaciones breves de una salida, recorrido, visita o actividad. Cada registro tiene identificador, título,
+descripción, fecha y marca de favorito. Lista, pantalla de edición, búsqueda por título y manejo claro de estados vacíos o errores. Registros en Room detrás
+de un contrato Repository; bitácora libre en <code>bitacora.txt</code>; resumen en <code>resumen.txt</code>.
+<br>Rama: <code>ej15-cuaderno-de-campo</code></p>
+
+<h3>Etapa 1 · Dibujo y responsabilidades</h3>
+<div class="bloque">
+<pre style="font-size:6.2pt;white-space:pre">┌──────── LISTA ("lista") ────────┐      ┌──── EDICIÓN ("editar/{id}") ────┐      ┌─ BITÁCORA ("bitacora") ─┐
+│ Cuaderno de campo     [Bitácora]│      │ ← Volver     Nuevo/Editar reg.  │      │ ← Volver     Bitácora   │
+│ [ Buscar por título ........ ]  │      │ [ Título ................ 0/60 ]│      │ ┌─────────────────────┐ │
+│ [Generar resumen] [Compartir ]  │ tap  │ [ Descripción ................ ]│      │ │ texto libre,        │ │
+│ 3 registros                     │ ───► │ Fecha: 05/11/2026     [Cambiar] │      │ │ párrafos y tildes   │ │
+│ ┌ 05/11 Reserva Costanera  ★ ┐  │      │ Favorito ★              [ ●  ]  │      │ └─────────────────────┘ │
+│ │ Garzas blancas... Eliminar │  │ ◄─── │ ● Cambios sin guardar           │      │ [Descartar] [Guardar]   │
+│ └────────────────────────────┘  │ save │ [          Guardar           ]  │      └─────────────────────────┘
+│                            (+)  │      └─────────────────────────────────┘
+└─────────────────────────────────┘</pre>
+</div>
+<div class="bloque">
+<pre>Compose (PantallaLista / PantallaEditar / PantallaBitacora)   ← dibuja y avisa
+   │ eventos ↑                                       estado ↓ (StateFlow)
+ViewModels (ListaRegistrosVM / EditarRegistroVM / BitacoraVM) ← reglas y estados
+   │ contratos
+RegistroRepository ─► RoomRegistroRepository ─► RegistroDao ─► cuaderno.db (Room/SQLite)
+BitacoraRepository ─► ArchivoBitacoraRepository ─────────────► bitacora.txt
+GeneradorResumen   ─► ArchivoResumen ────────────────────────► resumen.txt
+                       (todo armado por ContenedorApp en MvvmLabApp)</pre>
+</div>
+<table>
+  <tr><th style="width:18%">Pantalla</th><th>Estado de pantalla</th><th>Acciones del usuario (eventos)</th></tr>
+  <tr><td>Lista</td><td><code>carga</code> (Cargando/Listo/Error), <code>registros</code>, <code>busqueda</code>, <code>mensaje</code>, <code>error</code>, <code>textoParaCompartir</code></td>
+      <td>buscar, abrir, nuevo (+), favorito ★, eliminar, generar resumen, compartir, ir a bitácora, reintentar</td></tr>
+  <tr><td>Edición</td><td><code>carga</code>, <code>esNuevo</code>, <code>formulario</code> (título, descripción, fecha, favorito), <code>original</code>, <code>errores</code> por campo, <code>guardando</code>, <code>error</code>, <code>guardadoOk</code></td>
+      <td>editar cada campo, elegir fecha, marcar favorito, guardar, volver (con diálogo si hay cambios)</td></tr>
+  <tr><td>Bitácora</td><td><code>carga</code>, <code>texto</code>, <code>textoGuardado</code>, <code>guardando</code>, <code>mensaje</code>, <code>error</code></td>
+      <td>escribir, guardar, descartar, reintentar, volver</td></tr>
+</table>
+
+<h3>Etapa 2 · Registros y Room</h3>
+<div class="bloque">
+<pre>data class Registro(val id: String, val titulo: String, val descripcion: String,
+                    val fecha: Long, val favorito: Boolean)                     // dominio
+
+interface RegistroRepository {
+    fun observar(busqueda: String): Flow&lt;List&lt;Registro&gt;&gt;
+    suspend fun obtener(id: String): Registro?
+    suspend fun guardar(registro: Registro)
+    suspend fun eliminar(id: String)
+    suspend fun cambiarFavorito(id: String, favorito: Boolean)
+}
+
+@Query("""SELECT * FROM registros WHERE titulo LIKE '%' || :busqueda || '%'
+          ORDER BY favorito DESC, fecha DESC, actualizadoEn DESC""")
+fun observar(busqueda: String): Flow&lt;List&lt;RegistroEntity&gt;&gt;</pre>
+</div>
+<ul>
+  <li><strong>Alta, lectura, modificación y baja</strong> por el contrato; el ViewModel observa el <code>Flow</code> (nunca consulta el DAO desde Compose).</li>
+  <li><strong>Búsqueda</strong>: el ViewModel guarda el texto en un <code>MutableStateFlow</code> y usa <code>flatMapLatest</code>: cada vez que cambia la búsqueda deja de
+  observar la consulta anterior y observa la nueva. Room vuelve a emitir cuando la tabla cambia.</li>
+  <li><strong>Fecha</strong> como <code>Long</code> (medianoche UTC, lo que devuelve el <code>DatePicker</code> de Material 3), formateada siempre en UTC para que no “cambie de día”.</li>
+  <li><strong>Reglas</strong> (<code>ValidadorRegistro</code>): título no vacío y ≤ 60 caracteres, descripción no vacía, fecha no futura. Errores por campo.</li>
+</ul>
+
+<h3>Etapa 3 · Archivos de texto</h3>
+<table>
+  <tr><th style="width:18%">Archivo</th><th>Qué guarda</th><th>Cuándo se actualiza / qué pasa si falla</th></tr>
+  <tr><td><code>bitacora.txt</code></td><td>Texto libre del usuario, independiente de los registros. UTF-8, se conservan párrafos y tildes.</td>
+      <td>Al tocar Guardar en la pantalla Bitácora. Escritura con temporal + renombrado; si falla, error en pantalla y el texto sigue en el editor.</td></tr>
+  <tr><td><code>resumen.txt</code></td><td>Texto <em>generado</em> a partir de <strong>todos</strong> los registros (aunque haya búsqueda activa).</td>
+      <td><strong>Solo a pedido</strong> (“Generar resumen” o “Compartir”), no en cada alta. Si falla: mensaje de error, Room no se toca y el resumen anterior
+      queda completo (temporal + renombrado). Nunca se relee: no es fuente de verdad.</td></tr>
+</table>
+<p>Ninguno pide permisos: están en <code>filesDir</code>, la carpeta privada de la app.</p>
+
+<h3>Etapa 4 · Experimentos obligatorios (emulador)</h3>
+<table>
+  <tr><th style="width:36%">Experimento</th><th>Resultado observado</th></tr>
+  <tr><td>Cerrar (<code>force-stop</code>) y reabrir</td><td>“3 registros”, igual que antes de cerrar ✅</td></tr>
+  <tr><td>Rotar el emulador mientras se escribe</td><td>Título y descripción intactos en horizontal y al volver (estado en el ViewModel) ✅</td></tr>
+  <tr><td>Guardar con título vacío</td><td>“El título no puede estar vacío” y “Escribí una descripción” debajo de cada campo; no se guarda ✅</td></tr>
+  <tr><td>Falla controlada (<code>simularFallaEnRegistros = true</code>)</td><td>★ → “No se pudo marcar como favorito”; Guardar → “No se pudo guardar. Tus datos siguen en pantalla.” Sin cierres ✅</td></tr>
+  <tr><td>Editar un registro y regresar</td><td>La lista muestra “Patos y un atardecer dorado” al volver (Flow de Room) ✅</td></tr>
+  <tr><td>Verificar archivos y base</td><td><code>run-as ... ls</code>: <code>databases/cuaderno.db</code>, <code>files/bitacora.txt</code>, <code>files/resumen.txt</code>; contenido revisado con <code>cat</code> ✅</td></tr>
+</table>
+
+<div class="figs">
+  <figure><img src="img/ej15_lista.png" style="height:230px"><br>Lista (favorito arriba)</figure>
+  <figure><img src="img/ej15_titulo_vacio.png" style="height:230px"><br>Título vacío</figure>
+  <figure><img src="img/ej15_falla.png" style="height:230px"><br>Falla controlada</figure>
+  <figure><img src="img/ej15_bitacora.png" style="height:230px"><br>Bitácora (párrafos, tildes)</figure>
+</div>
+<div class="figs">
+  <figure><img src="img/ej15_rotado.png" style="width:300px"><br>Rotado mientras se escribe</figure>
+  <figure><img src="img/ej15_sin_resultados.png" style="height:200px"><br>Búsqueda sin resultados</figure>
+  <figure><img src="img/ej15_compartir.png" style="height:200px"><br>Compartir (Intent)</figure>
+</div>
+
+<h3>Etapa 5 · Entrega</h3>
+<p><strong>Las dos persistencias:</strong> los <strong>registros</strong> (estructurados, se buscan, ordenan, editan de a uno y la UI debe enterarse de cada cambio) van a
+<strong>Room</strong>, que es su única fuente de verdad. Los <strong>archivos de texto</strong> guardan lo que es texto para personas: la bitácora libre (que el usuario
+escribe y relee) y el resumen (que se genera desde Room y solo se lee o comparte).</p>
+<table>
+  <tr><th style="width:4%">#</th><th style="width:40%">Prueba</th><th>Resultado observado</th></tr>
+  <tr><td>1</td><td>Alta de 3 registros (uno favorito) → cerrar y reabrir</td><td>Persisten; el favorito aparece primero ✅</td></tr>
+  <tr><td>2</td><td>Buscar “feria” y luego “feriax”</td><td>1 resultado; luego “Ningún registro coincide con “feriax”.” ✅</td></tr>
+  <tr><td>3</td><td>Bitácora con “Sábado… / Domingo: llovió; … ñandú.” + nuevo párrafo → Guardar</td><td><code>bitacora.txt</code> con los 3 párrafos, tildes y ñ ✅</td></tr>
+  <tr><td>4</td><td>Generar resumen con búsqueda activa / Compartir</td><td><code>resumen.txt</code> con los 3 registros (★ / •); se abre el selector de Android ✅</td></tr>
+  <tr><td>5</td><td>Tests JVM (<code>CuadernoTest</code>)</td><td>11/11: validador, búsqueda, favorito, error de lectura, resumen, “título vacío nunca guarda”, error de escritura ✅</td></tr>
+</table>
+<div class="caja clave">
+  <strong class="titulo">Desafío opcional: compartir el resumen con un Intent</strong>
+  <code>Intent(Intent.ACTION_SEND)</code> con <code>type = "text/plain"</code> y <code>EXTRA_TEXT</code> = <strong>el contenido</strong> del resumen, dentro de
+  <code>Intent.createChooser(...)</code>. No se comparte la ruta interna (<code>/data/data/...</code>), que otra app no podría abrir y expondría la estructura privada.
+  El ViewModel solo prepara el texto (<code>textoParaCompartir</code>); la vista lo lanza con el <code>Context</code> (API del Android SDK) y avisa
+  <code>onCompartido()</code> para que no se repita.
+</div>
+<div class="caja ojo">
+  <strong class="titulo">Una decisión que cambiaría si el proyecto creciera</strong>
+  La búsqueda usa <code>LIKE '%texto%'</code>, que recorre toda la tabla y no distingue tildes (“rio” no encuentra “río”). Con miles de registros pasaría a
+  <strong>FTS (Full-Text Search) de Room</strong> con una columna normalizada sin tildes. También reemplazaría el contenedor manual por <strong>Hilt</strong> si
+  aparecieran muchas dependencias, y agregaría <strong>migraciones</strong> de Room (<code>version = 2</code>) en vez de recrear la base al cambiar la tabla.
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Cuál es la fuente de verdad de los registros?</strong><br>
+La tabla <code>registros</code> de Room (<code>cuaderno.db</code>), a través de <code>RegistroRepository</code>. Las pantallas observan su <code>Flow</code>; el resumen se genera
+desde ella y nunca al revés.</p>
+<p><strong>2. ¿La bitácora libre y el resumen cumplen el mismo papel?</strong><br>
+No. La <strong>bitácora</strong> es un <em>dato original</em> del usuario: él la escribe, se relee y es su propia fuente de verdad (si se pierde, se pierde información).
+El <strong>resumen</strong> es un <em>dato derivado</em>: se puede regenerar en cualquier momento desde Room; si se borra no se pierde nada.</p>
+<p><strong>3. ¿Qué sobreviviría a la eliminación del proceso y qué no?</strong><br>
+Sobreviven: los registros (Room), <code>bitacora.txt</code> y <code>resumen.txt</code> (disco). No sobreviven: lo escrito y no guardado en el formulario o la bitácora, el
+texto de búsqueda, los mensajes y el estado de los diálogos (viven en ViewModels y en la UI, en memoria).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Qué código corresponde a cada capa (criterio de finalización)</strong>
+  <table style="margin:6px 0 0;background:#fff">
+    <tr><th>Capa</th><th>Archivos</th></tr>
+    <tr><td>View (Compose)</td><td><code>PantallaLista.kt</code>, <code>PantallaEditar.kt</code>, <code>PantallaBitacora.kt</code>, <code>NavegacionApp.kt</code></td></tr>
+    <tr><td>ViewModel</td><td><code>ViewModels.kt</code> (Lista, Editar, Bitácora) + <code>ValidadorRegistro.kt</code></td></tr>
+    <tr><td>Repository (contratos)</td><td><code>Modelo.kt</code></td></tr>
+    <tr><td>Room</td><td><code>RegistroRoom.kt</code> (Entity, DAO, Database, adaptador)</td></tr>
+    <tr><td>Archivos</td><td><code>ArchivosCuaderno.kt</code> (bitácora, resumen, falla controlada)</td></tr>
+    <tr><td>Dependencias</td><td><code>ContenedorApp.kt</code> (contenedor + <code>Application</code>)</td></tr>
+    <tr><td>API de Android</td><td><code>Intent.ACTION_SEND</code> en <code>PantallaLista</code>; <code>filesDir</code> y <code>Room.databaseBuilder</code> en el contenedor</td></tr>
+  </table>
 </div>
 
 </body>
