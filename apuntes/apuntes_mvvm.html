@@ -1145,5 +1145,99 @@ Otra app no puede abrirla aunque conozca la ruta; para compartir el contenido ha
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 8 — Guardar texto, cerrar y volver</h2>
+<p><strong>Consigna:</strong> agregar al Repository la escritura del borrador en UTF-8. Escribir varias líneas, guardar, cerrar completamente la app y
+volver a abrirla: debe recuperarse el contenido. Elegir y documentar si se sobrescribe todo el archivo o se agrega al final.
+<strong>Desafío:</strong> botón “Descartar cambios” que vuelva a leer la versión guardada.
+<br>Rama: <code>ej08-guardar-archivo</code></p>
+
+<div class="bloque">
+<h3>Paso 1 · El contrato crece: <code>guardar(texto)</code></h3>
+<pre>interface BorradorRepository {
+    suspend fun leer(): ResultadoLectura
+    suspend fun guardar(texto: String)
+}
+
+override suspend fun guardar(texto: String) {
+    withContext(Dispatchers.IO) {                    // fuera del hilo principal
+        archivo.writeText(texto, Charsets.UTF_8)     // crea o REEMPLAZA el archivo
+    }
+}</pre>
+</div>
+<div class="caja clave">
+  <strong class="titulo">Decisión documentada: sobrescribir</strong>
+  Un borrador representa “el texto actual”, no un historial. Con <code>appendText</code> (agregar al final) cada guardado duplicaría el contenido anterior.
+  <code>writeText</code> crea el archivo si no existe y reemplaza lo que tenía. (Agregar al final serviría para un <em>log</em> o una bitácora de eventos.)
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · Estado: lo que se ve vs. lo que hay en disco</h3>
+<pre>data class BorradorUiState(
+    val texto: String = "",           // lo que está en el editor AHORA
+    val textoGuardado: String = "",   // lo que hay en DISCO (última lectura/escritura)
+    val guardando: Boolean = false,
+    val mensaje: String = "Leyendo borrador...",
+    val error: String? = null
+) {
+    val hayCambiosSinGuardar: Boolean get() = texto != textoGuardado
+}</pre>
+</div>
+<p>Es la misma idea del Ej 2 (“lo escrito no es lo guardado”), ahora con un disco real detrás. <code>hayCambiosSinGuardar</code> es calculada:
+se deduce comparando, no se guarda aparte.</p>
+
+<div class="bloque">
+<h3>Paso 3 · El ViewModel guarda y recién después confirma</h3>
+<pre>fun onGuardar() {
+    val actual = _uiState.value
+    if (actual.guardando) return
+    _uiState.update { it.copy(guardando = true, error = null) }
+    viewModelScope.launch {
+        try {
+            repositorio.guardar(actual.texto)
+            _uiState.update { it.copy(guardando = false, textoGuardado = actual.texto,
+                                      mensaje = "Guardado en borrador.txt") }   // DESPUÉS de escribir
+        } catch (e: IOException) {
+            _uiState.update { it.copy(guardando = false, error = "No se pudo guardar el borrador") }
+        }
+    }
+}
+
+fun onDescartarCambios() = cargarDesdeDisco()    // desafío: relee el archivo</pre>
+</div>
+<p><code>textoGuardado</code> se actualiza <strong>después</strong> de que <code>guardar</code> terminó sin error: si la escritura falla, la pantalla sigue mostrando
+“sin guardar”, que es la verdad. <code>cargarDesdeDisco()</code> es la misma función que se usa al abrir: descartar = volver a leer lo que hay en disco.</p>
+
+<div class="figs"><figure><img src="img/ej08_singuardar.png" style="height:260px"><br>Distinción visual: chip “● Sin guardar”,<br>etiqueta “Texto (sin guardar)” y botones activos</figure></div>
+<p>Con el texto igual al de disco se ve “✓ Guardado” y los botones Guardar/Descartar quedan deshabilitados (no hay nada que guardar ni descartar).</p>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:44%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Escribir 3 líneas (con Enter) → Guardar</td><td>“✓ Guardado”; <code>cat files/borrador.txt</code> muestra las 3 líneas ✅</td></tr>
+  <tr><td>Cerrar completamente (<code>am force-stop</code>) y volver a abrir</td><td>“Cargado desde borrador.txt” con las 3 líneas ✅</td></tr>
+  <tr><td>Archivo con “Canción: ñandú / Título con acentos áéíóú”, editar y Guardar</td><td>Tildes, ñ y salto de línea intactos; bytes UTF-8 (<code>303 263</code> = ó) ✅</td></tr>
+  <tr><td>Editar → Descartar cambios</td><td>Vuelve exactamente al texto del archivo, “✓ Guardado” ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué diferencia hay entre estado del ViewModel y datos en disco?</strong><br>
+El estado del ViewModel (<code>texto</code>) está en <strong>memoria</strong>: cambia en cada tecla, sobrevive a la rotación pero se pierde si muere el proceso.
+Los datos en disco (<code>borrador.txt</code>) son <strong>persistentes</strong>: sobreviven a cerrar la app y reiniciar el teléfono, pero solo cambian cuando se
+guarda explícitamente. Por eso pueden diferir, y esa diferencia es “cambios sin guardar”.</p>
+<p><strong>2. ¿Qué pasa con caracteres acentuados y saltos de línea?</strong><br>
+Se conservan siempre que se use <strong>la misma codificación al escribir y al leer</strong> (UTF-8 en ambos). En UTF-8 una letra acentuada ocupa 2 bytes;
+si se leyera con otra codificación (por ejemplo ISO-8859-1) aparecerían caracteres raros (“CanciÃ³n”). Los saltos de línea se guardan como el carácter
+<code>\n</code> y vuelven igual.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>writeText(texto, UTF_8)</code> en <code>Dispatchers.IO</code>: sobrescribe el borrador.</li>
+    <li><code>texto</code> (memoria) ≠ <code>textoGuardado</code> (disco) → “sin guardar”.</li>
+    <li>Se confirma “Guardado” solo después de escribir sin error.</li>
+    <li>Descartar = volver a leer el archivo.</li>
+  </ol>
+</div>
+
 </body>
 </html>

@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 7: Leer un archivo de texto desde el Repository
+# MvvmLab — Ejercicio 8: Guardar texto, cerrar y volver
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -18,50 +18,46 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej04-stateflow` | 4 — StateFlow: la pantalla observa |
 | `ej05-validacion` | 5 — Validar sin esconder la regla en un botón |
 | `ej06-repository` | 6 — Repository: cambiar datos sin cambiar la pantalla |
-| **`ej07-leer-archivo`** | **7 — Leer un archivo de texto desde el Repository** ← esta rama |
+| `ej07-leer-archivo` | 7 — Leer un archivo de texto desde el Repository |
+| **`ej08-guardar-archivo`** | **8 — Guardar texto, cerrar y volver** ← esta rama |
 
 ---
 
 ## Consigna
 
-Crear `ArchivoTextoRepository` para leer `borrador.txt` desde `filesDir`. Si no existe, devolver texto vacío o un resultado
-explícito (documentar la decisión). El ViewModel solicita la lectura y publica el resultado. No abrir el archivo desde un
-composable. Distinguir archivo inexistente de una falla real; `Dispatchers.IO`; sin referencias a la Activity.
-
-> Los Ej 7–9 de la guía trabajan sobre **un único borrador de texto**: en esta rama la app es un editor de borrador.
+Agregar al Repository la escritura del borrador en UTF-8. Escribir varias líneas, guardar, cerrar completamente la app y
+volver a abrirla: debe recuperarse el contenido. Documentar si se sobrescribe o se agrega al final.
+**Desafío:** botón "Descartar cambios" que vuelva a leer la versión guardada.
 
 ## Archivos
 
-| Archivo | Capa | Contenido |
-|---|---|---|
-| `BorradorRepository.kt` | Datos | `sealed interface ResultadoLectura` (`NoExiste` / `Leido`), `interface BorradorRepository`, `ArchivoTextoRepository(carpeta: File)` |
-| `BorradorViewModel.kt` | ViewModel | `BorradorUiState`, `BorradorViewModel` (lee en `init`), `Factory` con `viewModelFactory` |
-| `PantallaBorrador.kt` | View | Editor sin estado + 2 previews |
-| `MainActivity.kt` | — | `by viewModels { BorradorViewModel.Factory }` |
+| Archivo | Cambio |
+|---|---|
+| `BorradorRepository.kt` | `guardar(texto)` en el contrato; `ArchivoTextoRepository` usa `writeText(texto, UTF_8)` en `Dispatchers.IO` |
+| `BorradorViewModel.kt` | `textoGuardado` + `hayCambiosSinGuardar`; `onGuardar` y `onDescartarCambios` |
+| `PantallaBorrador.kt` | Chip "● Sin guardar" / "✓ Guardado", botones Guardar y Descartar cambios |
 
-## Decisión documentada
+## Decisión documentada: sobrescribir
 
-Si el archivo **no existe** se devuelve el resultado explícito `ResultadoLectura.NoExiste` (no `""`): "no existe" y "existe
-pero vacío" son situaciones distintas. Una **falla real** se informa con una excepción (`IOException`), que el ViewModel
-captura y muestra como error.
+Un borrador es "el texto actual", no un historial: `appendText` duplicaría el contenido en cada guardado.
+`writeText` crea el archivo si no existe y lo reemplaza.
 
 ## Pruebas (emulador)
 
 | Prueba | Resultado |
 |---|---|
-| Sin `borrador.txt` | "Todavía no hay borrador guardado" ✅ |
-| Archivo creado con `adb shell run-as` (3 líneas, tildes, ñ) | Aparece completo al abrir ✅ |
-| `borrador.txt` reemplazado por una carpeta | "No se pudo leer el borrador", Logcat `EISDIR`, sin cierre ✅ |
-
-**Desafío — Device Explorer:** `data/data/com.example.mvvmlab/files/borrador.txt`
-(o `adb shell run-as com.example.mvvmlab cat files/borrador.txt`).
+| 3 líneas → Guardar → `cat files/borrador.txt` | Las 3 líneas ✅ |
+| `am force-stop` y reabrir | Se recupera el contenido ✅ |
+| Archivo con "ñandú", "áéíóú" y salto de línea → editar → Guardar | Todo intacto, bytes UTF-8 ✅ |
+| Editar → Descartar cambios | Vuelve al texto del archivo ✅ |
 
 ## Preguntas de la guía
 
-**¿Dónde está físicamente el archivo?** `/data/data/com.example.mvvmlab/files/borrador.txt`, almacenamiento interno privado.
+**¿Qué diferencia hay entre estado del ViewModel y datos en disco?** El estado está en memoria (cambia en cada tecla,
+se pierde si muere el proceso); el disco es persistente y solo cambia al guardar. Su diferencia es "cambios sin guardar".
 
-**¿Otra app puede leerlo sin más?** No: cada app tiene su propio usuario Linux y su carpeta privada (sandbox).
+**¿Qué pasa con caracteres acentuados y saltos de línea?** Se conservan si se usa la misma codificación (UTF-8) al
+escribir y al leer; con otra codificación aparecerían caracteres raros ("CanciÃ³n").
 
 ## Criterio de finalización
-- ✅ Una nota escrita previamente en el archivo aparece al abrir la pantalla.
-- ✅ La UI no accede al sistema de archivos.
+- ✅ El texto persiste tras reiniciar y se distingue visualmente un borrador sin guardar.

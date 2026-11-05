@@ -5,7 +5,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 // =====================================================================
-// EJERCICIO 7 — Leer un archivo de texto desde el Repository
+// EJERCICIOS 7 y 8 — Leer y guardar un archivo de texto desde el Repository
 // =====================================================================
 
 // DECISION DOCUMENTADA: si el archivo no existe se devuelve un RESULTADO
@@ -28,6 +28,7 @@ sealed interface ResultadoLectura {
 // Contrato: el ViewModel solo conoce esto.
 interface BorradorRepository {
     suspend fun leer(): ResultadoLectura
+    suspend fun guardar(texto: String)       // Ej 8
 }
 
 // Implementacion con un archivo de texto en el almacenamiento INTERNO
@@ -51,6 +52,19 @@ class ArchivoTextoRepository(carpeta: File) : BorradorRepository {
                 ResultadoLectura.Leido(archivo.readText(Charsets.UTF_8))
             }
         }
+
+    // Ej 8 — DECISION DOCUMENTADA: se SOBRESCRIBE todo el archivo.
+    // Un borrador representa "el texto actual", no un historial: si se
+    // agregara al final (appendText), cada guardado duplicaria el contenido.
+    // writeText crea el archivo si no existe y reemplaza lo que tenia.
+    //
+    // UTF-8 explicito: la misma codificacion al leer y al escribir; asi las
+    // tildes, la ñ y los saltos de linea vuelven exactamente igual.
+    override suspend fun guardar(texto: String) {
+        withContext(Dispatchers.IO) {                 // fuera del hilo principal
+            archivo.writeText(texto, Charsets.UTF_8)  // puede lanzar IOException
+        }
+    }
 
     companion object {
         const val NOMBRE_ARCHIVO = "borrador.txt"

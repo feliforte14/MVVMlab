@@ -20,30 +20,44 @@ import java.io.IOException
 
 // --- ESTADO DE PANTALLA -----------------------------------------------
 data class BorradorUiState(
-    val texto: String = "",
-    val mensaje: String = "Leyendo borrador...",   // de donde salio el texto
-    val error: String? = null                       // falla real de lectura
-)
+    val texto: String = "",            // lo que esta en el editor AHORA (estado del ViewModel)
+    val textoGuardado: String = "",    // lo que hay en DISCO segun la ultima lectura/escritura
+    val guardando: Boolean = false,
+    val mensaje: String = "Leyendo borrador...",
+    val error: String? = null
+) {
+    // Ej 8: distinguir visualmente un borrador sin guardar.
+    // Calculado: el editor difiere de lo que hay en disco.
+    val hayCambiosSinGuardar: Boolean get() = texto != textoGuardado
+}
 
 // --- VIEWMODEL --------------------------------------------------------
 class BorradorViewModel(
-    private val repositorio: BorradorRepository      // solo conoce el contrato
+    private val repositorio: BorradorRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BorradorUiState())
     val uiState: StateFlow<BorradorUiState> = _uiState.asStateFlow()
 
     init {
-        // El ViewModel SOLICITA la lectura y PUBLICA el resultado.
-        // La pantalla nunca toca el sistema de archivos.
+        cargarDesdeDisco()
+    }
+
+    // Lee el archivo y reemplaza el texto del editor por lo que hay en disco.
+    // Se usa al abrir y en "Descartar cambios" (desafio).
+    private fun cargarDesdeDisco() {
         viewModelScope.launch {
             try {
                 when (val r = repositorio.leer()) {
                     is ResultadoLectura.Leido -> _uiState.update {
-                        it.copy(texto = r.texto, mensaje = "Cargado desde ${ArchivoTextoRepository.NOMBRE_ARCHIVO}")
+                        it.copy(
+                            texto = r.texto, textoGuardado = r.texto, error = null,
+                            mensaje = "Cargado desde ${ArchivoTextoRepository.NOMBRE_ARCHIVO}"
+                        )
                     }
                     ResultadoLectura.NoExiste -> _uiState.update {
-                        it.copy(mensaje = "Todavía no hay borrador guardado")
+                        it.copy(texto = "", textoGuardado = "", error = null,
+                            mensaje = "Todavía no hay borrador guardado")
                     }
                 }
             } catch (e: IOException) {
@@ -57,14 +71,33 @@ class BorradorViewModel(
         _uiState.update { it.copy(texto = nuevo) }
     }
 
+    fun onGuardar() {
+        val actual = _uiState.value
+        if (actual.guardando) return
+        _uiState.update { it.copy(guardando = true, error = null) }
+        viewModelScope.launch {
+            try {
+                repositorio.guardar(actual.texto)
+                // Recien DESPUES de escribir se actualiza lo "guardado".
+                _uiState.update {
+                    it.copy(guardando = false, textoGuardado = actual.texto,
+                        mensaje = "Guardado en ${ArchivoTextoRepository.NOMBRE_ARCHIVO}")
+                }
+            } catch (e: IOException) {
+                Log.e(TAG, "No se pudo guardar el borrador", e)
+                _uiState.update { it.copy(guardando = false, error = "No se pudo guardar el borrador") }
+            }
+        }
+    }
+
+    // Desafio: volver a la version guardada (relee el archivo).
+    fun onDescartarCambios() {
+        cargarDesdeDisco()
+    }
+
     companion object {
         private const val TAG = "BorradorViewModel"
 
-        // Fabrica: como el ViewModel ahora RECIBE un repositorio que necesita
-        // la carpeta filesDir, Android no puede crearlo solo. Esta fabrica le
-        // explica como. Toma el Application (vive lo que vive la app, no una
-        // Activity) solo para obtener filesDir.
-        // (En el Ej 11 la construccion de dependencias se ordena en un solo lugar.)
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[APPLICATION_KEY])
@@ -81,6 +114,8 @@ fun PantallaBorradorConViewModel(viewModel: BorradorViewModel, modifier: Modifie
     PantallaBorrador(
         estado = estado,
         onTextoChange = viewModel::onTextoChange,
+        onGuardar = viewModel::onGuardar,
+        onDescartarCambios = viewModel::onDescartarCambios,
         modifier = modifier
     )
 }
