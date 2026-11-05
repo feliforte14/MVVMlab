@@ -670,5 +670,103 @@ archivo o Room (Ej 6 en adelante).</p>
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 4 — StateFlow: la pantalla observa</h2>
+<p><strong>Consigna:</strong> exponer desde el ViewModel un <code>StateFlow</code> de sólo lectura y mantener mutable su implementación. En Compose
+recolectarlo con la API consciente del ciclo de vida (<code>collectAsStateWithLifecycle</code>). Hacer que editar un campo cambie el estado visible.
+<strong>Desafío:</strong> registrar cambios puntuales y comprobar que editar un campo no borra el otro.
+<br>Rama: <code>ej04-stateflow</code> · Archivo principal: <code>NotaViewModel.kt</code></p>
+
+<h3>Paso 0 · ¿Qué cambia respecto del Ej 3?</h3>
+<p>En el Ej 3 el estado era un <code>mutableStateOf</code> (una API <strong>de Compose</strong>) dentro del ViewModel. Funciona, pero ata el ViewModel a Compose.
+<code>StateFlow</code> es una API <strong>de Kotlin (corrutinas)</strong>: el ViewModel queda independiente de la interfaz, y es lo que usan Room, los
+Repository y casi toda la documentación oficial.</p>
+
+<div class="caja clave">
+  <strong class="titulo">StateFlow</strong>
+  Un “contenedor observable” que <strong>siempre tiene un valor actual</strong> (<code>.value</code>) y <strong>avisa a quien lo observe</strong> cada vez que cambia.
+  Es el patrón <em>Observer</em> de la teoría: el ViewModel produce, la pantalla se suscribe y reacciona. <code>MutableStateFlow</code> se puede escribir;
+  <code>StateFlow</code> solo se puede leer.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · Backing property: mutable adentro, solo lectura afuera</h3>
+<pre>class NotaViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(NotaUiState())     // PRIVADO: solo el VM escribe
+    val uiState: StateFlow&lt;NotaUiState&gt; = _uiState.asStateFlow() // PÚBLICO: solo lectura
+}</pre>
+</div>
+<ul>
+  <li>Por convención, el guion bajo (<code>_uiState</code>) marca la versión privada y mutable.</li>
+  <li><code>asStateFlow()</code> devuelve una vista de <strong>solo lectura</strong> del mismo flujo: aunque alguien intente castearla, no puede escribir.</li>
+  <li>Es la versión “flujo” del <code>private set</code> del Ej 3.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · Los eventos usan <code>update { }</code></h3>
+<pre>fun onTituloChange(nuevo: String) {
+    _uiState.update { it.copy(titulo = nuevo, error = null) }
+}
+fun onContenidoChange(nuevo: String) {
+    _uiState.update { it.copy(contenido = nuevo) }
+}</pre>
+<p><code>update { actual -&gt; nuevo }</code> toma el valor <strong>actual</strong> y lo reemplaza por el que devuelve la lambda (<code>it</code> = estado actual).
+Cada evento hace <code>copy</code> <strong>solo del campo que le corresponde</strong> → editar el título nunca borra el contenido (desafío).
+Además <code>update</code> es <strong>atómico</strong>: si dos cambios llegan casi juntos, ninguno pisa al otro.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 3 · La pantalla observa con <code>collectAsStateWithLifecycle</code></h3>
+<pre>@Composable
+fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
+    val estado by viewModel.uiState.collectAsStateWithLifecycle()
+    PantallaNota(
+        estado = estado,
+        onTituloChange = viewModel::onTituloChange,
+        onContenidoChange = viewModel::onContenidoChange,
+        onGuardar = viewModel::onGuardar
+    )
+}</pre>
+</div>
+<ul>
+  <li><strong>collect</strong> = suscribirse al flujo; <strong>AsState</strong> = convertir cada valor en un <code>State</code> de Compose → cuando llega uno nuevo, se recompone.</li>
+  <li><strong>WithLifecycle</strong> = deja de recolectar cuando la app pasa a segundo plano (no gasta trabajo en una pantalla que nadie ve) y retoma al volver.
+  La versión sin ciclo de vida, <code>collectAsState()</code>, seguiría recolectando en segundo plano.</li>
+  <li>Compose <strong>no guarda una segunda copia</strong> de la nota (ningún <code>remember</code> con el título): lee siempre la del ViewModel (criterio de finalización).</li>
+  <li><code>PantallaNota</code> y <code>NotaUiState</code> <strong>no cambiaron</strong>.</li>
+</ul>
+
+<div class="caja ojo">
+  <strong class="titulo">Dependencia agregada (justificada)</strong>
+  <code>collectAsStateWithLifecycle</code> vive en <code>androidx.lifecycle:lifecycle-runtime-compose</code>, que el proyecto no tenía. Se agregó en
+  <code>libs.versions.toml</code> con versión <code>2.10.0</code>, la <strong>misma</strong> de lifecycle que ya usaba el proyecto (no se actualizó nada más).
+  La guía la nombra explícitamente como la API esperada.
+</div>
+
+<h3>Experimento: registrar cambios puntuales (Logcat, filtro <code>NotaViewModel</code>)</h3>
+<pre>titulo -&gt; titulo='Parcial D'   contenido='Repasar StateFlow' error=null guardando=false
+titulo -&gt; titulo='Parcial DA'  contenido='Repasar StateFlow' error=null guardando=false
+titulo -&gt; titulo='Parcial DA1' contenido='Repasar StateFlow' error=null guardando=false</pre>
+<p>Se escribió el contenido y <em>después</em> se siguió editando el título: el contenido se mantiene en cada cambio. ✅</p>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Por qué la pantalla no debería poder modificar directamente <code>_uiState</code>?</strong><br>
+Porque rompería el flujo unidireccional: el ViewModel dejaría de ser el único dueño del estado y cualquier pantalla podría saltearse las reglas
+(por ejemplo, poner <code>guardando = false</code> a mano o guardar un título vacío). Si solo el ViewModel escribe, cada cambio pasa por un evento
+con nombre (<code>onGuardar</code>...) y es fácil saber <em>quién</em> cambió <em>qué</em>. El compilador lo garantiza: <code>_uiState</code> es privado.</p>
+<p><strong>2. ¿Qué parte se recompone?</strong><br>
+Cuando llega un estado nuevo se vuelve a ejecutar <code>PantallaNotaConViewModel</code> (es quien lee <code>estado</code>) y, dentro de <code>PantallaNota</code>,
+Compose redibuja solo lo que depende de valores que cambiaron: al escribir en el título se actualiza ese <code>OutlinedTextField</code> y el aviso de
+“cambios sin guardar”; partes cuyos parámetros no cambiaron (el texto fijo “Nueva nota”, la tarjeta de la nota guardada) se <em>saltean</em>.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>_uiState: MutableStateFlow</code> privado + <code>uiState: StateFlow</code> público de solo lectura.</li>
+    <li>Eventos con <code>_uiState.update { it.copy(...) }</code>: atómico y sin pisar otros campos.</li>
+    <li>La pantalla recolecta con <code>collectAsStateWithLifecycle()</code> y no guarda copias propias.</li>
+    <li>StateFlow es Kotlin, no Compose: el ViewModel no depende de la UI.</li>
+  </ol>
+</div>
+
 </body>
 </html>

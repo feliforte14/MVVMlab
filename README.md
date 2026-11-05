@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 3: Primer ViewModel, sin magia
+# MvvmLab — Ejercicio 4: StateFlow, la pantalla observa
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -7,72 +7,66 @@ Kotlin + Jetpack Compose + Material 3.
 
 ## Ramas
 
-Cada rama contiene **solo el código de su ejercicio**.
+Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una rama a la siguiente).
 
 | Rama | Ejercicio |
 |---|---|
 | `main` | Proyecto base (Empty Activity Compose) |
 | `ej01-responsabilidades` | 1 — ¿Quién está haciendo demasiado? |
 | `ej02-estado-pantalla` | 2 — Una pantalla no es su estado |
-| **`ej03-viewmodel`** | **3 — Primer ViewModel, sin magia** ← esta rama |
+| `ej03-viewmodel` | 3 — Primer ViewModel, sin magia |
+| **`ej04-stateflow`** | **4 — StateFlow: la pantalla observa** ← esta rama |
 
 ---
 
 ## Consigna
 
-Mover la lógica del ejercicio anterior a una clase que extienda `ViewModel`. La pantalla recibe estado y
-funciones de evento, sin decidir cómo se guarda una nota. Obtener el ViewModel con el mecanismo apropiado
-y comprobar qué sucede al rotar el emulador.
-**Desafío:** contador de intentos de guardado para observar la vida del ViewModel.
+Exponer desde el ViewModel un `StateFlow` de sólo lectura y mantener mutable su implementación. En Compose
+recolectarlo con `collectAsStateWithLifecycle`. Hacer que editar un campo cambie el estado visible.
+**Desafío:** registrar cambios puntuales y comprobar que editar un campo no borra el otro.
 
 ## Archivos
 
-| Archivo | Capa | Contenido |
+| Archivo | Capa | Cambio respecto del Ej 3 |
 |---|---|---|
-| `NotaUiState.kt` | Modelo / estado | `Nota` (nota guardada) y `NotaUiState` (estado de pantalla) |
-| `PantallaNota.kt` | View | Composable **sin estado**: dibuja `NotaUiState` y avisa eventos por callbacks. 3 previews |
-| `NotaViewModel.kt` | ViewModel | Dueño del estado y de las reglas; `PantallaNotaConViewModel` conecta VM ↔ View |
-| `MainActivity.kt` | — | Obtiene el ViewModel con `by viewModels()` y lo pasa a la pantalla. No valida nada |
+| `NotaViewModel.kt` | ViewModel | `mutableStateOf` → `MutableStateFlow` privado + `StateFlow` público; eventos con `update { }`; logs |
+| `NotaUiState.kt` | Estado | Sin cambios |
+| `PantallaNota.kt` | View | Sin cambios |
+| `gradle/libs.versions.toml`, `app/build.gradle.kts` | — | Dependencia `lifecycle-runtime-compose` 2.10.0 (misma versión de lifecycle que ya usaba el proyecto) |
 
 ## Puntos clave
 
-- `class NotaViewModel : ViewModel()` — hereda de `ViewModel`, por eso **sobrevive a la rotación**.
-- `var estado by mutableStateOf(NotaUiState())` + **`private set`** — la pantalla lo lee, pero solo el ViewModel lo cambia.
-- `onTituloChange`, `onContenidoChange`, `onGuardar` — las reglas del Ej 2, ahora como métodos del ViewModel.
-- `viewModelScope.launch { delay(1500) ... }` — guardado simulado; si se rota a mitad, sigue y termina.
-- `init { Log.d(...) }` / `onCleared()` — permiten ver en **Logcat** (filtro `NotaViewModel`) cuándo nace y muere.
-- `private val notaViewModel: NotaViewModel by viewModels()` — devuelve **el mismo** ViewModel tras la rotación. Nunca `NotaViewModel()` a mano.
-- No se agregaron dependencias: `viewModels()` y `viewModelScope` ya venían con `activity-compose` / `lifecycle`.
+```kotlin
+private val _uiState = MutableStateFlow(NotaUiState())          // solo el VM escribe
+val uiState: StateFlow<NotaUiState> = _uiState.asStateFlow()    // la pantalla solo lee
 
-## Experimentos (emulador Pixel 8)
+fun onTituloChange(nuevo: String) = _uiState.update { it.copy(titulo = nuevo, error = null) }
 
-| Prueba | Resultado observado |
-|---|---|
-| Rotar con la versión del Ej 2 (`remember`) | Título y contenido **se borran** |
-| Rotar con el ViewModel | Se conservan título, contenido, nota guardada e **intentos: 2**. `ViewModel CREADO` aparece **una sola vez** en Logcat |
-| App en segundo plano + `adb shell am kill` y volver | Pantalla **vacía**, intentos: 0. Logcat: un segundo `ViewModel CREADO` con otro id |
+// En Compose:
+val estado by viewModel.uiState.collectAsStateWithLifecycle()
+```
+
+- `update { }` es atómico y cada evento copia solo su campo → editar el título no borra el contenido.
+- `collectAsStateWithLifecycle` deja de recolectar en segundo plano (`collectAsState` no).
+- Compose no guarda una segunda copia de la nota: lee siempre la del ViewModel.
+
+## Experimento (Logcat, filtro `NotaViewModel`)
+
+```
+titulo -> titulo='Parcial DA'  contenido='Repasar StateFlow' error=null guardando=false
+titulo -> titulo='Parcial DA1' contenido='Repasar StateFlow' error=null guardando=false
+```
+El contenido se mantiene mientras se edita el título. ✅
 
 ## Preguntas de la guía
 
-**¿Qué problema resuelve el ViewModel?**
-(a) Sobrevive a los **cambios de configuración** (rotación, idioma, modo oscuro): el estado de pantalla y las
-operaciones en curso no se pierden cuando Android recrea la Activity. (b) **Saca la lógica de la UI**: las reglas
-quedan en una clase que no dibuja ni conoce la Activity.
+**¿Por qué la pantalla no debería poder modificar directamente `_uiState`?**
+Rompería el flujo unidireccional: el ViewModel dejaría de ser el único dueño del estado y la pantalla podría
+saltearse las reglas. Si solo el ViewModel escribe, todo cambio pasa por un evento con nombre.
 
-**¿Qué sucederá si el proceso se elimina completamente?**
-El ViewModel vive en memoria dentro del proceso: si Android lo mata o el usuario cierra la app, muere con él y al
-volver se crea uno nuevo, vacío. **Un ViewModel no es persistencia.** Para eso: `SavedStateHandle` /
-`rememberSaveable` (datos chicos de pantalla) o un Repository con archivo / Room (Ej 6 en adelante).
-
-| | Recomposición | Rotación | Muerte del proceso |
-|---|---|---|---|
-| `remember` | ✅ | ❌ | ❌ |
-| `rememberSaveable` | ✅ | ✅ | ✅* |
-| ViewModel | ✅ | ✅ | ❌ |
-| Repository + archivo / Room | ✅ | ✅ | ✅ |
-
-\* Datos chicos, y solo si el proceso lo mató Android (no si el usuario cerró la app).
+**¿Qué parte se recompone?**
+`PantallaNotaConViewModel` (lee `estado`) y, dentro de `PantallaNota`, solo los elementos cuyos valores cambiaron;
+los que reciben los mismos parámetros se saltean.
 
 ## Criterio de finalización
-- ✅ La Activity no contiene validación de notas.
-- ✅ El ViewModel no contiene llamadas a composables.
+- ✅ Compose muestra el estado emitido y no mantiene una segunda copia de la nota.
