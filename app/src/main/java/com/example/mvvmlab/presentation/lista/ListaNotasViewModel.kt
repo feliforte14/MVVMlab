@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.lista
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -7,25 +7,16 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.mvvmlab.MvvmLabApp
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.domain.repository.NotaRepository
+import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
-
-sealed interface EstadoCarga {
-    data object Cargando : EstadoCarga
-    data object Listo : EstadoCarga
-    data class Error(val mensaje: String) : EstadoCarga
-}
-
-data class ListaUiState(
-    val carga: EstadoCarga = EstadoCarga.Cargando,
-    val notas: List<Nota> = emptyList(),
-    val errorOperacion: String? = null
-)
 
 // ViewModel de la pantalla LISTA. No guarda su propia copia "de verdad":
 // OBSERVA el Flow del Repository y publica lo que llega.

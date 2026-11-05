@@ -1,4 +1,4 @@
-package com.example.mvvmlab.ui.theme
+package com.example.mvvmlab.core.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

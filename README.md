@@ -27,6 +27,53 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── MvvmLabApp.kt
+ ├── core/
+ │   ├── model/
+ │   │   ├── EstadoCarga.kt
+ │   ├── navigation/
+ │   │   ├── Rutas.kt
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── ArchivoNotasRepository.kt
+ │   │   ├── NotaRepositoryEnMemoria.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ │   ├── repository/
+ │   │   ├── NotaRepository.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorNota.kt
+ ├── presentation/
+ │   ├── AppNotas.kt
+ │   ├── detalle/
+ │   │   ├── DetalleNotaViewModel.kt
+ │   │   ├── DetalleUiState.kt
+ │   │   ├── PantallaDetalle.kt
+ │   ├── lista/
+ │   │   ├── ListaNotasViewModel.kt
+ │   │   ├── ListaUiState.kt
+ │   │   ├── PantallaLista.kt
+ ├── di/
+ │   ├── ContenedorApp.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/
+ │   ├── validacion/
+ │   │   ├── ValidadorNotaTest.kt
+```
+
 ## Consigna
 
 Separar la lista de notas y el detalle/editor. Al guardar desde el detalle, la lista debe mostrar lo actualizado al regresar.
@@ -37,13 +84,13 @@ no objetos. **Desafío:** volver atrás con cambios sin guardar y decidir qué p
 
 | Archivo | Capa | Contenido |
 |---|---|---|
-| `NotaRepository.kt` | Datos | Contrato con `observarTodas(): Flow` + `obtener(id)`; `ArchivoNotasRepository` emite tras cada escritura |
-| `NotaRepositoryEnMemoria.kt` | Datos | Misma API con `MutableStateFlow` |
-| `ContenedorApp.kt` | App | Sin cambios (una instancia compartida) |
-| `ListaNotasViewModel.kt` | ViewModel | Observa (`collect`) el Flow; eliminar sin recargar |
-| `DetalleNotaViewModel.kt` | ViewModel | Recibe el `id` por `SavedStateHandle`; carga, valida y guarda |
-| `Pantallas.kt` | View | `PantallaLista` (FAB +) y `PantallaDetalle` (diálogo "¿Descartar cambios?") |
-| `NavegacionApp.kt` | Navegación | `NavHost`: `"lista"` y `"detalle/{id}"` |
+| `domain/repository/NotaRepository.kt` | Datos | Contrato con `observarTodas(): Flow` + `obtener(id)`; `ArchivoNotasRepository` emite tras cada escritura |
+| `data/repository/NotaRepositoryEnMemoria.kt` | Datos | Misma API con `MutableStateFlow` |
+| `di/ContenedorApp.kt` | App | Sin cambios (una instancia compartida) |
+| `presentation/lista/ListaNotasViewModel.kt` | ViewModel | Observa (`collect`) el Flow; eliminar sin recargar |
+| `presentation/detalle/DetalleNotaViewModel.kt` | ViewModel | Recibe el `id` por `SavedStateHandle`; carga, valida y guarda |
+| `presentation/lista/PantallaLista.kt + presentation/detalle/PantallaDetalle.kt` | View | `PantallaLista` (FAB +) y `PantallaDetalle` (diálogo "¿Descartar cambios?") |
+| `presentation/AppNotas.kt` | Navegación | `NavHost`: `"lista"` y `"detalle/{id}"` |
 | `libs.versions.toml`, `app/build.gradle.kts` | — | `navigation-compose 2.9.0`, `lifecycle-viewmodel-compose 2.10.0` |
 
 ## Decisiones
