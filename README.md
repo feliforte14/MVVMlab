@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 4: StateFlow, la pantalla observa
+# MvvmLab — Ejercicio 5: Validar sin esconder la regla en un botón
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -15,58 +15,50 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej01-responsabilidades` | 1 — ¿Quién está haciendo demasiado? |
 | `ej02-estado-pantalla` | 2 — Una pantalla no es su estado |
 | `ej03-viewmodel` | 3 — Primer ViewModel, sin magia |
-| **`ej04-stateflow`** | **4 — StateFlow: la pantalla observa** ← esta rama |
+| `ej04-stateflow` | 4 — StateFlow: la pantalla observa |
+| **`ej05-validacion`** | **5 — Validar sin esconder la regla en un botón** ← esta rama |
 
 ---
 
 ## Consigna
 
-Exponer desde el ViewModel un `StateFlow` de sólo lectura y mantener mutable su implementación. En Compose
-recolectarlo con `collectAsStateWithLifecycle`. Hacer que editar un campo cambie el estado visible.
-**Desafío:** registrar cambios puntuales y comprobar que editar un campo no borra el otro.
+Agregar reglas: título no vacío, contenido de al menos diez caracteres y prohibición de guardar dos veces mientras se
+procesa una solicitud. Ubicar las reglas fuera de la vista. Mostrar errores cerca de los campos.
+**Desafío:** probar espacios en blanco, una nota válida y dos pulsaciones seguidas.
 
 ## Archivos
 
-| Archivo | Capa | Cambio respecto del Ej 3 |
+| Archivo | Capa | Cambio |
 |---|---|---|
-| `NotaViewModel.kt` | ViewModel | `mutableStateOf` → `MutableStateFlow` privado + `StateFlow` público; eventos con `update { }`; logs |
-| `NotaUiState.kt` | Estado | Sin cambios |
-| `PantallaNota.kt` | View | Sin cambios |
-| `gradle/libs.versions.toml`, `app/build.gradle.kts` | — | Dependencia `lifecycle-runtime-compose` 2.10.0 (misma versión de lifecycle que ya usaba el proyecto) |
+| `ValidadorNota.kt` | Reglas (Kotlin puro) | **Nuevo**: `ValidadorNota.validar(titulo, contenido): ErroresNota` |
+| `NotaViewModel.kt` | ViewModel | `onGuardar` aplica las reglas; `if (guardando) return` evita el doble guardado |
+| `NotaUiState.kt` | Estado | `error` → `errorTitulo` + `errorContenido` (un error por campo) |
+| `PantallaNota.kt` | View | Cada campo muestra su error con `isError` + `supportingText` |
+| `app/src/test/.../ValidadorNotaTest.kt` | Test | **Nuevo**: 5 tests JUnit (sin emulador) |
 
-## Puntos clave
+## Reglas
 
-```kotlin
-private val _uiState = MutableStateFlow(NotaUiState())          // solo el VM escribe
-val uiState: StateFlow<NotaUiState> = _uiState.asStateFlow()    // la pantalla solo lee
+| Regla | Dónde vive |
+|---|---|
+| Título no vacío (`isBlank`: solo espacios cuenta como vacío) | `ValidadorNota` |
+| Contenido ≥ 10 caracteres (`trim()` antes de contar) | `ValidadorNota` |
+| No guardar dos veces mientras se procesa | `NotaViewModel.onGuardar` (el botón deshabilitado es solo ayuda visual) |
 
-fun onTituloChange(nuevo: String) = _uiState.update { it.copy(titulo = nuevo, error = null) }
+**¿Cuándo se limpia un error?** Al editar el campo que lo causó, y solo ese error.
 
-// En Compose:
-val estado by viewModel.uiState.collectAsStateWithLifecycle()
-```
+## Pruebas
 
-- `update { }` es atómico y cada evento copia solo su campo → editar el título no borra el contenido.
-- `collectAsStateWithLifecycle` deja de recolectar en segundo plano (`collectAsState` no).
-- Compose no guarda una segunda copia de la nota: lee siempre la del ViewModel.
-
-## Experimento (Logcat, filtro `NotaViewModel`)
-
-```
-titulo -> titulo='Parcial DA'  contenido='Repasar StateFlow' error=null guardando=false
-titulo -> titulo='Parcial DA1' contenido='Repasar StateFlow' error=null guardando=false
-```
-El contenido se mantiene mientras se edita el título. ✅
+- `ValidadorNotaTest`: 5/5 ✅ (solo espacios, espacios alrededor, borde de 10 caracteres, nota válida, ambos errores).
+- Emulador: título `"   "` y contenido `"corto"` → cada error debajo de su campo; doble toque rápido → Logcat muestra **un solo** `guardando`.
 
 ## Preguntas de la guía
 
-**¿Por qué la pantalla no debería poder modificar directamente `_uiState`?**
-Rompería el flujo unidireccional: el ViewModel dejaría de ser el único dueño del estado y la pantalla podría
-saltearse las reglas. Si solo el ViewModel escribe, todo cambio pasa por un evento con nombre.
+**¿Cuál es una regla de negocio y cuál es una decisión visual?**
+Regla: "contenido ≥ 10 caracteres", "no guardar dos veces a la vez" (valen en cualquier interfaz).
+Visual: error en rojo debajo del campo, botón deshabilitado, texto "Guardando...".
 
-**¿Qué parte se recompone?**
-`PantallaNotaConViewModel` (lee `estado`) y, dentro de `PantallaNota`, solo los elementos cuyos valores cambiaron;
-los que reciben los mismos parámetros se saltean.
+**¿En qué momento conviene limpiar un mensaje de error?**
+Cuando el usuario modifica el campo que lo causó, y solo ese error.
 
 ## Criterio de finalización
-- ✅ Compose muestra el estado emitido y no mantiene una segunda copia de la nota.
+- ✅ Se cumplen las validaciones y el botón sólo comunica una intención al ViewModel.

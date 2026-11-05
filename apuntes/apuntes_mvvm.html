@@ -768,5 +768,110 @@ Compose redibuja solo lo que depende de valores que cambiaron: al escribir en el
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 5 — Validar sin esconder la regla en un botón</h2>
+<p><strong>Consigna:</strong> agregar reglas: título no vacío, contenido de al menos diez caracteres y prohibición de guardar dos veces mientras se
+procesa una solicitud. Ubicar las reglas fuera de la vista. Mostrar errores cerca de los campos, sin diálogos para cada tecla.
+<strong>Desafío:</strong> probar espacios en blanco, una nota válida y dos pulsaciones seguidas.
+<br>Rama: <code>ej05-validacion</code> · Archivos nuevos: <code>ValidadorNota.kt</code>, <code>ValidadorNotaTest.kt</code></p>
+
+<h3>Paso 0 · El problema: la regla “escondida” en el botón</h3>
+<p>Si la validación se escribe dentro del <code>onClick</code> del botón (como en la pantalla del Ej 1), la regla queda mezclada con la interfaz:
+no se puede probar sin abrir la pantalla, no se puede reutilizar y, si mañana se guarda desde otro lugar (otro botón, un atajo), hay que copiarla.
+La regla es <strong>del negocio</strong>, no del botón.</p>
+
+<div class="bloque">
+<h3>Paso 1 · <code>ValidadorNota</code>: las reglas en Kotlin puro</h3>
+<pre>data class ErroresNota(val titulo: String? = null, val contenido: String? = null) {
+    val hayErrores: Boolean get() = titulo != null || contenido != null
+}
+
+object ValidadorNota {
+    const val MIN_CARACTERES_CONTENIDO = 10
+
+    fun validar(titulo: String, contenido: String): ErroresNota = ErroresNota(
+        titulo = if (titulo.isBlank()) "El título no puede estar vacío" else null,
+        contenido = if (contenido.trim().length &lt; MIN_CARACTERES_CONTENIDO)
+            "El contenido debe tener al menos $MIN_CARACTERES_CONTENIDO caracteres" else null
+    )
+}</pre>
+</div>
+<ul>
+  <li><strong><code>object</code></strong>: un <em>singleton</em>, una clase con una única instancia. Sirve para funciones sin estado: se llama directo, <code>ValidadorNota.validar(...)</code>.</li>
+  <li><strong><code>isBlank()</code></strong> vs <code>isEmpty()</code>: <code>"   ".isEmpty()</code> es <code>false</code>, pero <code>"   ".isBlank()</code> es <code>true</code>. Con <code>isBlank</code> un título de solo espacios es inválido.</li>
+  <li><strong><code>trim()</code></strong> saca los espacios de los extremos antes de contar: <code>"   corto   "</code> tiene 11 caracteres pero solo 5 reales.</li>
+  <li><strong><code>ErroresNota</code></strong> tiene un error <em>por campo</em>: así cada mensaje se puede mostrar al lado de su campo.</li>
+  <li><strong><code>const val</code></strong>: constante conocida en compilación; el número 10 está en un solo lugar.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · El ViewModel aplica las reglas; el botón solo avisa</h3>
+<pre>fun onGuardar() {
+    val actual = _uiState.value
+    if (actual.guardando) return                                  // regla 3: no guardar dos veces
+
+    val errores = ValidadorNota.validar(actual.titulo, actual.contenido) // reglas 1 y 2
+    if (errores.hayErrores) {
+        _uiState.update { it.copy(errorTitulo = errores.titulo, errorContenido = errores.contenido) }
+        return
+    }
+    _uiState.update { it.copy(guardando = true) }
+    viewModelScope.launch { delay(1500); _uiState.update { it.copy(guardando = false, guardada = ...) } }
+}</pre>
+</div>
+<div class="caja clave">
+  <strong class="titulo">Regla 3: dos capas de protección</strong>
+  <code>enabled = !estado.guardando</code> en el botón es la ayuda <strong>visual</strong> (el usuario ve que no puede tocar). <code>if (actual.guardando) return</code>
+  en el ViewModel es la <strong>regla</strong>: aunque llegaran dos clics antes de que el botón se deshabilite, el segundo se ignora. La regla no puede
+  depender de que la vista se dibuje a tiempo.
+</div>
+
+<h3>Paso 3 · Estado: un error por campo</h3>
+<p><code>NotaUiState</code> reemplaza <code>error</code> por <code>errorTitulo</code> y <code>errorContenido</code>. La vista solo decide <em>cómo</em> mostrarlos:</p>
+<pre>OutlinedTextField(
+    value = estado.contenido, onValueChange = onContenidoChange,
+    isError = estado.errorContenido != null,                     // borde rojo
+    supportingText = { estado.errorContenido?.let { Text(it) } } // mensaje debajo del campo
+)</pre>
+
+<div class="figs"><figure><img src="img/ej05_errores.png" style="height:260px"><br>Título con solo espacios y contenido “corto”:<br>cada error debajo de su campo</figure></div>
+
+<h3>Paso 4 · ¿Cuándo se limpia un error?</h3>
+<pre>fun onTituloChange(nuevo: String) {
+    _uiState.update { it.copy(titulo = nuevo, errorTitulo = null) }   // solo el error del título
+}</pre>
+<p>Cuando el usuario <strong>edita ese campo</strong>: indica que lo está corrigiendo y no lo molesta en cada tecla. Se limpia <strong>solo el error del
+campo editado</strong>; el del otro campo sigue visible hasta que lo corrija. La validación completa se vuelve a hacer al pulsar Guardar.</p>
+
+<h3>Paso 5 · Tests del validador (desafío)</h3>
+<p><code>app/src/test/.../ValidadorNotaTest.kt</code> — tests JUnit que corren en la computadora, <strong>sin emulador</strong> (click derecho → Run):</p>
+<table>
+  <tr><th>Test</th><th>Comprueba</th><th>Resultado</th></tr>
+  <tr><td><code>tituloSoloEspacios_esInvalido</code></td><td><code>"     "</code> no es un título válido</td><td>✅</td></tr>
+  <tr><td><code>contenidoConEspaciosAlrededor_noCuentaLosEspacios</code></td><td><code>"   corto   "</code> no alcanza los 10</td><td>✅</td></tr>
+  <tr><td><code>contenidoDeExactamente10Caracteres_esValido</code></td><td>Borde: 10 caracteres es válido</td><td>✅</td></tr>
+  <tr><td><code>notaValida_noTieneErrores</code></td><td>Una nota correcta pasa</td><td>✅</td></tr>
+  <tr><td><code>ambosCamposMal_informaAmbosErrores</code></td><td>Se informan los dos errores juntos</td><td>✅</td></tr>
+</table>
+<p><strong>Dos pulsaciones seguidas</strong> (en el emulador, dos toques casi simultáneos): Logcat muestra un único <code>guardando '...'</code> → se guardó una sola vez. ✅</p>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Cuál es una regla de negocio y cuál es una decisión visual?</strong><br>
+<em>Regla de negocio</em>: “el contenido debe tener al menos 10 caracteres”, “no se guarda dos veces a la vez” — valen igual en Android, web o una API.
+<em>Decisión visual</em>: mostrar el error en rojo debajo del campo, deshabilitar el botón, el texto “Guardando...”. Si cambio la interfaz, las
+decisiones visuales cambian; las reglas no.</p>
+<p><strong>2. ¿En qué momento conviene limpiar un mensaje de error?</strong><br>
+Cuando el usuario modifica el campo que lo causó (y solo ese error). Limpiarlo antes (o validar en cada tecla mostrando errores desde la primera letra)
+molesta; no limpiarlo nunca deja un mensaje desactualizado mientras el usuario ya lo está corrigiendo.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Las reglas viven en <code>ValidadorNota</code> (Kotlin puro) → se prueban sin emulador.</li>
+    <li>El botón solo comunica la intención; el ViewModel aplica las reglas.</li>
+    <li>“No guardar dos veces” es una regla del ViewModel; el botón deshabilitado es solo ayuda visual.</li>
+    <li>Un error por campo, mostrado debajo de su campo, y limpiado al editar ese campo.</li>
+  </ol>
+</div>
+
 </body>
 </html>

@@ -16,68 +16,55 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// =====================================================================
-// EJERCICIO 4 — StateFlow: la pantalla observa
-// =====================================================================
-//
-// En el Ej 3 el estado era un mutableStateOf (API de Compose) con
-// "private set". Ahora el ViewModel expone un StateFlow (API de Kotlin,
-// no de Compose): un "contenedor observable" que siempre tiene un valor
-// actual y avisa a quien lo observe cada vez que cambia.
-//
-// Patron "backing property":
-//   _uiState  -> MutableStateFlow, PRIVADO: solo el ViewModel escribe.
-//   uiState   -> StateFlow, PUBLICO y de SOLO LECTURA: la pantalla observa.
-// =====================================================================
-
 class NotaViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(NotaUiState())
     val uiState: StateFlow<NotaUiState> = _uiState.asStateFlow()
 
     // --- EVENTOS --------------------------------------------------------
-    // update { actual -> nuevo } toma el valor ACTUAL y lo reemplaza por el
-    // que devuelve la lambda. Como cada evento hace copy() solo del campo
-    // que le corresponde, editar el titulo nunca borra el contenido
-    // (desafio de la guia).
 
+    // Ej 5: ¿cuando limpiar el error? Cuando el usuario EDITA ese campo:
+    // muestra que "ya lo esta corrigiendo" sin molestarlo en cada tecla.
+    // Solo se limpia el error del campo editado; el del otro se mantiene.
     fun onTituloChange(nuevo: String) {
-        _uiState.update { it.copy(titulo = nuevo, error = null) }
-        registrar("titulo")
+        _uiState.update { it.copy(titulo = nuevo, errorTitulo = null) }
     }
 
     fun onContenidoChange(nuevo: String) {
-        _uiState.update { it.copy(contenido = nuevo) }
-        registrar("contenido")
+        _uiState.update { it.copy(contenido = nuevo, errorContenido = null) }
     }
 
+    // El boton solo comunica la INTENCION "quiero guardar".
+    // Las reglas se aplican aca (y en ValidadorNota), no en la vista.
     fun onGuardar() {
-        val actual = _uiState.value                      // .value = valor actual del flujo
-        if (actual.guardando) return
+        val actual = _uiState.value
 
-        if (actual.titulo.isBlank()) {
-            _uiState.update { it.copy(error = "El título no puede estar vacío") }
-            registrar("guardar (error)")
+        // Regla 3: no guardar dos veces mientras se procesa una solicitud.
+        // (El boton deshabilitado es la ayuda VISUAL; esta linea es la REGLA:
+        //  aunque llegaran dos clics seguidos, el segundo se ignora.)
+        if (actual.guardando) {
+            Log.d(TAG, "onGuardar ignorado: ya se esta guardando")
             return
         }
 
-        _uiState.update { it.copy(guardando = true, error = null) }
-        registrar("guardar (inicio)")
+        // Reglas 1 y 2: delegadas al validador (Kotlin puro).
+        val errores = ValidadorNota.validar(actual.titulo, actual.contenido)
+        if (errores.hayErrores) {
+            _uiState.update {
+                it.copy(errorTitulo = errores.titulo, errorContenido = errores.contenido)
+            }
+            return
+        }
+
+        _uiState.update { it.copy(guardando = true) }
+        Log.d(TAG, "guardando '${actual.titulo}'")
 
         viewModelScope.launch {
             delay(1500)                                  // guardado SIMULADO
             _uiState.update {
                 it.copy(guardando = false, guardada = Nota(it.titulo, it.contenido))
             }
-            registrar("guardar (fin)")
         }
-    }
-
-    // Desafio: "registrar cambios puntuales". Filtrar Logcat por NotaViewModel.
-    private fun registrar(evento: String) {
-        val e = _uiState.value
-        Log.d(TAG, "$evento -> titulo='${e.titulo}' contenido='${e.contenido}' " +
-                "error=${e.error} guardando=${e.guardando}")
     }
 
     companion object {
@@ -89,17 +76,10 @@ class NotaViewModel : ViewModel() {
 // --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
 @Composable
 fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
-    // collectAsStateWithLifecycle: se suscribe al StateFlow y convierte cada
-    // valor nuevo en un State de Compose -> cuando cambia, se recompone.
-    // "WithLifecycle": deja de recolectar cuando la app pasa a segundo plano
-    // (no gasta trabajo dibujando algo que nadie ve) y retoma al volver.
-    //
-    // Compose NO guarda una segunda copia de la nota: lee siempre la del VM.
     val estado by viewModel.uiState.collectAsStateWithLifecycle()
-
     PantallaNota(
-        estado = estado,                                 // el estado BAJA
-        onTituloChange = viewModel::onTituloChange,      // los eventos SUBEN
+        estado = estado,
+        onTituloChange = viewModel::onTituloChange,
         onContenidoChange = viewModel::onContenidoChange,
         onGuardar = viewModel::onGuardar,
         modifier = modifier.verticalScroll(rememberScrollState())

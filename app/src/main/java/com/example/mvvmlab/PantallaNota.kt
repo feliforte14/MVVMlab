@@ -41,8 +41,10 @@ fun PantallaNota(
             value = estado.titulo,
             onValueChange = onTituloChange,
             label = { Text("Título") },
-            isError = estado.error != null,
-            supportingText = { estado.error?.let { Text(it) } },
+            // Decision VISUAL: el error se muestra debajo de SU campo, en rojo.
+            // (La regla que lo produce esta en ValidadorNota, no aca.)
+            isError = estado.errorTitulo != null,
+            supportingText = { estado.errorTitulo?.let { Text(it) } },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -51,6 +53,8 @@ fun PantallaNota(
             value = estado.contenido,
             onValueChange = onContenidoChange,
             label = { Text("Contenido") },
+            isError = estado.errorContenido != null,
+            supportingText = { estado.errorContenido?.let { Text(it) } },
             minLines = 4,
             modifier = Modifier.fillMaxWidth()
         )
@@ -99,7 +103,11 @@ fun PantallaNotaVaciaPreview() {
 fun PantallaNotaErrorPreview() {
     MvvmLabTheme {
         PantallaNota(
-            NotaUiState(contenido = "Texto sin título", error = "El título no puede estar vacío"),
+            NotaUiState(
+                contenido = "Corto",
+                errorTitulo = "El título no puede estar vacío",
+                errorContenido = "El contenido debe tener al menos 10 caracteres"
+            ),
             {}, {}, {}
         )
     }
