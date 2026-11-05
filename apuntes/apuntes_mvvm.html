@@ -1239,5 +1239,130 @@ si se leyera con otra codificación (por ejemplo ISO-8859-1) aparecerían caract
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 9 — Cargando, listo o falló</h2>
+<p><strong>Consigna:</strong> modelar un estado de carga y uno de error para las operaciones de lectura/escritura. Usar <code>viewModelScope</code> para iniciar
+el trabajo y despachar el acceso a disco en IO. Evitar que una excepción cierre la app. Para comprobar la ruta de error, usar temporalmente un Repository
+de prueba que lance una excepción controlada (no alterar permisos). <strong>Desafío:</strong> ofrecer Reintentar si la carga falla.
+<br>Rama: <code>ej09-carga-error</code> · Archivo nuevo: <code>RepositorioQueFalla.kt</code></p>
+
+<h3>Paso 0 · El problema de las banderas sueltas</h3>
+<p>Con <code>cargando: Boolean</code>, <code>error: String?</code> y <code>texto</code> por separado se pueden armar combinaciones absurdas: ¿qué muestra la pantalla si
+<code>cargando = true</code> <em>y</em> <code>error != null</code>? La teoría (diapositiva 12) propone un <strong>tipo sellado</strong>: cada operación está en
+<em>exactamente uno</em> de sus estados posibles.</p>
+
+<div class="bloque">
+<h3>Paso 1 · Dos tipos sellados: lectura y guardado</h3>
+<pre>sealed interface EstadoCarga {
+    data object Cargando : EstadoCarga
+    data object Listo : EstadoCarga
+    data class Error(val mensaje: String) : EstadoCarga
+}
+
+sealed interface EstadoGuardado {
+    data object Inactivo : EstadoGuardado     // todavía no se intentó
+    data object Guardando : EstadoGuardado
+    data object Guardado : EstadoGuardado     // SOLO después de completar la escritura
+    data class Error(val mensaje: String) : EstadoGuardado
+}
+
+data class BorradorUiState(
+    val carga: EstadoCarga = EstadoCarga.Cargando,
+    val guardado: EstadoGuardado = EstadoGuardado.Inactivo,
+    val texto: String = "", val textoGuardado: String = "", val existeArchivo: Boolean = false
+) {
+    val puedeEditar: Boolean get() = carga == EstadoCarga.Listo
+    val puedeGuardar: Boolean get() = puedeEditar &amp;&amp; hayCambiosSinGuardar &amp;&amp; guardado != EstadoGuardado.Guardando
+}</pre>
+</div>
+<p>Son dos tipos porque son dos operaciones independientes: puede fallar el guardado con la carga en <code>Listo</code>. Las propiedades calculadas
+(<code>puedeEditar</code>, <code>puedeGuardar</code>) dejan las reglas en el estado y no en la vista.</p>
+
+<div class="bloque">
+<h3>Paso 2 · El ViewModel: <code>viewModelScope</code> + IO + <code>try/catch</code></h3>
+<pre>private fun cargar() {
+    _uiState.update { it.copy(carga = EstadoCarga.Cargando) }
+    viewModelScope.launch {                       // inicia el trabajo
+        try {
+            val r = repositorio.leer()            // el Repository usa withContext(Dispatchers.IO)
+            _uiState.update { it.copy(carga = EstadoCarga.Listo, texto = ..., textoGuardado = ...) }
+        } catch (e: IOException) {
+            _uiState.update { it.copy(carga = EstadoCarga.Error("No se pudo leer el borrador.")) }
+        }
+    }
+}
+fun onReintentar() = cargar()                     // desafío</pre>
+</div>
+<ul>
+  <li><strong>Quién hace qué con los hilos:</strong> el ViewModel <em>inicia</em> con <code>viewModelScope.launch</code> (hilo principal); el Repository <em>despacha</em>
+  el disco con <code>withContext(Dispatchers.IO)</code>. El ViewModel no necesita saber que hay un disco.</li>
+  <li><strong>La excepción se captura</strong> y se convierte en estado: la app no se cierra y el usuario ve qué pasó.</li>
+  <li><strong><code>onReintentar</code></strong> reutiliza la misma función de carga.</li>
+</ul>
+<div class="caja ojo">
+  <strong class="titulo">¿Qué excepción NO conviene capturar silenciosamente?</strong>
+  <code>CancellationException</code>. Es la forma en que Kotlin <strong>cancela</strong> una corrutina (por ejemplo, cuando el ViewModel se destruye y
+  <code>viewModelScope</code> se cancela). Un <code>catch (e: Exception)</code> genérico la atraparía, la corrutina seguiría corriendo como si nada y se podría
+  mostrar un error falso. Por eso se captura <strong>solo <code>IOException</code></strong> (las fallas de disco esperables). Si alguna vez se captura
+  <code>Exception</code>, hay que relanzar la cancelación: <code>catch (e: CancellationException) { throw e }</code>.
+</div>
+
+<div class="bloque">
+<h3>Paso 3 · Repository de prueba que falla (sin tocar permisos)</h3>
+<pre>class RepositorioQueFalla(
+    private var fallasDeLectura: Int = 1,        // la 1ª lectura falla, la 2ª funciona → probar Reintentar
+    private val fallarEscritura: Boolean = true,
+    private val demoraMs: Long = 1200            // para ver "Cargando..." en pantalla
+) : BorradorRepository {
+    override suspend fun leer(): ResultadoLectura {
+        delay(demoraMs)
+        if (fallasDeLectura &gt; 0) { fallasDeLectura--; throw IOException("Falla de lectura simulada") }
+        ...
+    }
+    override suspend fun guardar(texto: String) {
+        delay(demoraMs)
+        if (fallarEscritura) throw IOException("Falla de escritura simulada")
+    }
+}
+// Se activa con una constante en la fábrica:
+const val USAR_REPOSITORIO_QUE_FALLA = false</pre>
+</div>
+<p>Es otra implementación del <strong>mismo contrato</strong>: el ViewModel y la pantalla no cambian. Esto es lo que el Ej 6 anticipaba (“la interfaz ayuda a probar”).</p>
+
+<div class="figs">
+  <figure><img src="img/ej09_cargando.png" style="height:230px"><br>Cargando<br>(editor deshabilitado)</figure>
+  <figure><img src="img/ej09_error.png" style="height:230px"><br>Falló la carga<br>→ Reintentar</figure>
+  <figure><img src="img/ej09_error_guardar.png" style="height:230px"><br>Falló el guardado:<br>el texto sigue en pantalla</figure>
+</div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:44%">Prueba (con <code>RepositorioQueFalla</code>)</th><th>Resultado</th></tr>
+  <tr><td>Abrir la app</td><td>“Cargando borrador...” con indicador; editor y botones deshabilitados ✅</td></tr>
+  <tr><td>Termina la lectura (falla)</td><td>Tarjeta roja “No se pudo leer el borrador.” + <strong>Reintentar</strong>; la app no se cierra ✅</td></tr>
+  <tr><td>Reintentar</td><td>Vuelve a “Cargando...” y luego muestra el texto ✅</td></tr>
+  <tr><td>Editar → Guardar (escritura falla)</td><td>“Guardando...” y después “No se pudo guardar. Tus cambios siguen en pantalla.”; el texto editado se conserva ✅</td></tr>
+  <tr><td>Con el repositorio real (<code>false</code>)</td><td>Carga el archivo, Guardar → “✓ Guardado” y el archivo cambia ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué excepción no conviene capturar silenciosamente?</strong><br>
+<code>CancellationException</code> (ver recuadro): es el mecanismo de cancelación de las corrutinas. Tampoco conviene un <code>catch</code> genérico que “trague”
+cualquier error sin mostrarlo ni registrarlo: el problema queda oculto. Acá cada falla se registra en Logcat <em>y</em> se muestra al usuario.</p>
+<p><strong>2. ¿Por qué un mensaje “Guardado” sólo corresponde después de completar la escritura?</strong><br>
+Porque si se mostrara al <em>pedir</em> guardar y la escritura fallara, el usuario creería que sus datos están a salvo, cerraría la app y los perdería.
+El estado tiene que describir la verdad: <code>Guardando</code> mientras se escribe, <code>Guardado</code> solo cuando <code>guardar()</code> terminó sin excepción,
+<code>Error</code> si falló.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Tipos sellados (<code>EstadoCarga</code>, <code>EstadoGuardado</code>) en vez de banderas sueltas; <code>when</code> exhaustivo en la vista.</li>
+    <li>ViewModel inicia con <code>viewModelScope</code>; el Repository despacha el disco en IO.</li>
+    <li>Capturar <code>IOException</code>, nunca silenciar <code>CancellationException</code>.</li>
+    <li>“Guardado” solo después de escribir. Reintentar reutiliza la carga.</li>
+    <li>Las fallas se prueban con un Repository falso, no tocando el dispositivo.</li>
+  </ol>
+</div>
+
 </body>
 </html>

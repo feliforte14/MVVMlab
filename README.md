@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 8: Guardar texto, cerrar y volver
+# MvvmLab — Ejercicio 9: Cargando, listo o falló
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -19,45 +19,42 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej05-validacion` | 5 — Validar sin esconder la regla en un botón |
 | `ej06-repository` | 6 — Repository: cambiar datos sin cambiar la pantalla |
 | `ej07-leer-archivo` | 7 — Leer un archivo de texto desde el Repository |
-| **`ej08-guardar-archivo`** | **8 — Guardar texto, cerrar y volver** ← esta rama |
+| `ej08-guardar-archivo` | 8 — Guardar texto, cerrar y volver |
+| **`ej09-carga-error`** | **9 — Cargando, listo o falló** ← esta rama |
 
 ---
 
 ## Consigna
 
-Agregar al Repository la escritura del borrador en UTF-8. Escribir varias líneas, guardar, cerrar completamente la app y
-volver a abrirla: debe recuperarse el contenido. Documentar si se sobrescribe o se agrega al final.
-**Desafío:** botón "Descartar cambios" que vuelva a leer la versión guardada.
+Modelar un estado de carga y uno de error para lectura/escritura. `viewModelScope` para iniciar el trabajo y disco en IO.
+Evitar que una excepción cierre la app. Probar la ruta de error con un Repository de prueba que lance una excepción
+controlada (sin tocar permisos). **Desafío:** Reintentar si la carga falla.
 
 ## Archivos
 
 | Archivo | Cambio |
 |---|---|
-| `BorradorRepository.kt` | `guardar(texto)` en el contrato; `ArchivoTextoRepository` usa `writeText(texto, UTF_8)` en `Dispatchers.IO` |
-| `BorradorViewModel.kt` | `textoGuardado` + `hayCambiosSinGuardar`; `onGuardar` y `onDescartarCambios` |
-| `PantallaBorrador.kt` | Chip "● Sin guardar" / "✓ Guardado", botones Guardar y Descartar cambios |
-
-## Decisión documentada: sobrescribir
-
-Un borrador es "el texto actual", no un historial: `appendText` duplicaría el contenido en cada guardado.
-`writeText` crea el archivo si no existe y lo reemplaza.
+| `BorradorViewModel.kt` | `sealed interface EstadoCarga` (Cargando/Listo/Error) y `EstadoGuardado` (Inactivo/Guardando/Guardado/Error); `try/catch (IOException)`; `onReintentar`; constante `USAR_REPOSITORIO_QUE_FALLA` en la fábrica |
+| `RepositorioQueFalla.kt` | **Nuevo**: implementación del contrato que falla a propósito (1ª lectura y toda escritura) con demora |
+| `PantallaBorrador.kt` | `when` exhaustivo: indicador de carga, tarjeta de error con Reintentar, mensaje de guardado |
+| `BorradorRepository.kt` | Sin cambios (ya despacha en `Dispatchers.IO`) |
 
 ## Pruebas (emulador)
 
 | Prueba | Resultado |
 |---|---|
-| 3 líneas → Guardar → `cat files/borrador.txt` | Las 3 líneas ✅ |
-| `am force-stop` y reabrir | Se recupera el contenido ✅ |
-| Archivo con "ñandú", "áéíóú" y salto de línea → editar → Guardar | Todo intacto, bytes UTF-8 ✅ |
-| Editar → Descartar cambios | Vuelve al texto del archivo ✅ |
+| `RepositorioQueFalla`: abrir | "Cargando borrador..." → "No se pudo leer el borrador." + Reintentar, sin cierre ✅ |
+| Reintentar | Carga el texto ✅ |
+| Editar → Guardar (falla) | "No se pudo guardar. Tus cambios siguen en pantalla." ✅ |
+| Repositorio real | Carga y "✓ Guardado" ✅ |
 
 ## Preguntas de la guía
 
-**¿Qué diferencia hay entre estado del ViewModel y datos en disco?** El estado está en memoria (cambia en cada tecla,
-se pierde si muere el proceso); el disco es persistente y solo cambia al guardar. Su diferencia es "cambios sin guardar".
+**¿Qué excepción no conviene capturar silenciosamente?** `CancellationException`: es cómo se cancelan las corrutinas.
+Un `catch (e: Exception)` genérico la atraparía. Por eso se captura solo `IOException`.
 
-**¿Qué pasa con caracteres acentuados y saltos de línea?** Se conservan si se usa la misma codificación (UTF-8) al
-escribir y al leer; con otra codificación aparecerían caracteres raros ("CanciÃ³n").
+**¿Por qué "Guardado" sólo después de completar la escritura?** Si se mostrara antes y la escritura fallara, el usuario
+creería que sus datos están a salvo y los perdería.
 
 ## Criterio de finalización
-- ✅ El texto persiste tras reiniciar y se distingue visualmente un borrador sin guardar.
+- ✅ Se ven estados de carga, éxito y error; ninguna operación de archivo se realiza directamente en la UI.
