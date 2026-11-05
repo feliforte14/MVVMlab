@@ -1016,5 +1016,134 @@ que falle a propósito, sin archivos ni base de datos, y comprobar las reglas de
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 7 — Leer un archivo de texto desde el Repository</h2>
+<p><strong>Consigna:</strong> crear <code>ArchivoTextoRepository</code> para leer <code>borrador.txt</code> desde <code>filesDir</code>. Si no existe, devolver texto vacío
+o un resultado explícito (documentar la decisión). El ViewModel solicita la lectura y publica el resultado. No abrir el archivo desde un composable.
+Distinguir archivo inexistente de una falla real; usar <code>Dispatchers.IO</code>; no guardar referencias a la Activity.
+<strong>Desafío:</strong> inspeccionar el archivo con Device Explorer.
+<br>Rama: <code>ej07-leer-archivo</code> · Archivos: <code>BorradorRepository.kt</code>, <code>BorradorViewModel.kt</code>, <code>PantallaBorrador.kt</code></p>
+
+<div class="caja ojo">
+  <strong class="titulo">Cambio de pantalla</strong>
+  Los Ej 7, 8 y 9 de la guía trabajan sobre <strong>un único borrador de texto</strong>; en el Ej 10 se vuelve a varias notas. Por eso en esta rama la app
+  es un editor de borrador (las notas, el validador y su Repository viven en las ramas anteriores).
+</div>
+
+<h3>Paso 0 · ¿Dónde se guarda? <code>filesDir</code></h3>
+<p>Cada app tiene una carpeta <strong>privada</strong> en el almacenamiento interno: <code>/data/data/com.example.mvvmlab/files/</code> (se obtiene con
+<code>context.filesDir</code>). No hace falta pedir permisos, nadie más puede leerla y se borra al desinstalar la app.</p>
+
+<div class="bloque">
+<h3>Paso 1 · Decisión documentada: resultado explícito</h3>
+<pre>sealed interface ResultadoLectura {
+    data object NoExiste : ResultadoLectura
+    data class Leido(val texto: String) : ResultadoLectura
+}</pre>
+</div>
+<p>Si el archivo no existe se devuelve <code>NoExiste</code> y <strong>no</strong> un texto vacío: “no existe” y “existe pero está vacío” son situaciones distintas,
+y con <code>""</code> no habría forma de diferenciarlas. Una <strong>falla real</strong> (permiso, disco, archivo dañado) no es un resultado: se informa con una
+<strong>excepción</strong> (<code>IOException</code>).</p>
+<div class="caja clave">
+  <strong class="titulo"><code>sealed interface</code> (teoría, diapositiva 12)</strong>
+  Restringe los subtipos a un conjunto <strong>conocido por el compilador</strong>. Un <code>when</code> sobre un <code>ResultadoLectura</code> es <em>exhaustivo</em>:
+  si mañana se agrega un caso, el compilador marca todos los <code>when</code> que no lo contemplan. <code>data object</code> = un caso sin datos;
+  <code>data class</code> = un caso con datos.
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · El Repository lee en <code>Dispatchers.IO</code></h3>
+<pre>interface BorradorRepository {
+    suspend fun leer(): ResultadoLectura
+}
+
+class ArchivoTextoRepository(carpeta: File) : BorradorRepository {
+    private val archivo = File(carpeta, "borrador.txt")
+
+    override suspend fun leer(): ResultadoLectura =
+        withContext(Dispatchers.IO) {
+            if (!archivo.exists()) ResultadoLectura.NoExiste
+            else ResultadoLectura.Leido(archivo.readText(Charsets.UTF_8))   // puede lanzar IOException
+        }
+}</pre>
+</div>
+<ul>
+  <li><strong><code>withContext(Dispatchers.IO)</code></strong>: ejecuta el bloque en hilos pensados para disco y red. Leer un archivo en el hilo principal puede
+  congelar la pantalla (y Android lo detecta como mala práctica).</li>
+  <li><strong>Recibe un <code>File</code> (la carpeta), no un <code>Context</code> ni una Activity</strong>: es lo único que necesita. Si guardara la Activity,
+  el Repository la mantendría viva después de que Android la destruya (<em>fuga de memoria</em>).</li>
+  <li><strong><code>Charsets.UTF_8</code></strong>: se indica la codificación para que tildes y ñ se lean bien.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · El ViewModel solicita y publica</h3>
+<pre>class BorradorViewModel(private val repositorio: BorradorRepository) : ViewModel() {
+    init {
+        viewModelScope.launch {
+            try {
+                when (val r = repositorio.leer()) {
+                    is ResultadoLectura.Leido -&gt; _uiState.update { it.copy(texto = r.texto, mensaje = "Cargado desde borrador.txt") }
+                    ResultadoLectura.NoExiste -&gt; _uiState.update { it.copy(mensaje = "Todavía no hay borrador guardado") }
+                }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(mensaje = "", error = "No se pudo leer el borrador") }
+            }
+        }
+    }
+}</pre>
+</div>
+<p><code>when (val r = ...)</code> guarda el resultado en <code>r</code> y elige la rama según su tipo; dentro de <code>is ResultadoLectura.Leido</code>, Kotlin ya sabe que
+<code>r</code> tiene <code>texto</code> (<em>smart cast</em>). La pantalla nunca toca el sistema de archivos: recibe <code>BorradorUiState</code>.</p>
+
+<div class="bloque">
+<h3>Paso 4 · La fábrica: cómo se construye un ViewModel con parámetros</h3>
+<pre>companion object {
+    val Factory: ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            val app = checkNotNull(this[APPLICATION_KEY])
+            BorradorViewModel(ArchivoTextoRepository(app.filesDir))
+        }
+    }
+}
+// En MainActivity:
+private val borradorViewModel: BorradorViewModel by viewModels { BorradorViewModel.Factory }</pre>
+</div>
+<p>Ahora el ViewModel <strong>recibe</strong> un repositorio que necesita <code>filesDir</code>, y Android no sabe crearlo solo. La <strong>fábrica</strong> le explica cómo.
+Usa el <code>Application</code> (vive lo que vive la app, no una pantalla) solo para obtener <code>filesDir</code>. <code>viewModelFactory</code> ya venía en
+<code>lifecycle-viewmodel</code>: no se agregaron dependencias. En el <strong>Ej 11</strong> esto se ordena en un único lugar.</p>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:42%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Abrir sin <code>borrador.txt</code></td><td>“Todavía no hay borrador guardado” (caso <code>NoExiste</code>) ✅</td></tr>
+  <tr><td>Crear el archivo (<code>adb shell run-as ... printf ... &gt; files/borrador.txt</code>) con tres líneas, tildes y “ñandú”, y reabrir</td><td>El texto aparece completo al abrir la pantalla ✅</td></tr>
+  <tr><td>Falla real: reemplazar <code>borrador.txt</code> por una <em>carpeta</em></td><td>“No se pudo leer el borrador”; Logcat: <code>FileNotFoundException ... EISDIR (Is a directory)</code>. La app no se cierra ✅</td></tr>
+</table>
+<div class="figs"><figure><img src="img/ej07_leido.png" style="height:250px"><br>Borrador escrito previamente en el archivo,<br>cargado al abrir la pantalla</figure></div>
+
+<div class="caja regla">
+  <strong class="titulo">Desafío: Device Explorer</strong>
+  En Android Studio: <em>View → Tool Windows → Device Explorer</em> → <code>data/data/com.example.mvvmlab/files/borrador.txt</code>. Doble click lo abre;
+  click derecho → <em>Upload</em> permite subir un archivo propio para probar. Equivalente por consola:
+  <code>adb shell run-as com.example.mvvmlab cat files/borrador.txt</code>.
+</div>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Dónde está físicamente el archivo?</strong><br>
+En el almacenamiento interno del dispositivo, en la carpeta privada de la app: <code>/data/data/com.example.mvvmlab/files/borrador.txt</code>
+(también visible como <code>/data/user/0/...</code>). Se borra al desinstalar la app.</p>
+<p><strong>2. ¿Otra app puede leerlo sin más?</strong><br>
+No. Cada app corre con su propio usuario de Linux y la carpeta <code>/data/data/&lt;paquete&gt;</code> solo es accesible para ese usuario (<em>sandbox</em>).
+Otra app no puede abrirla aunque conozca la ruta; para compartir el contenido habría que hacerlo explícitamente (por ejemplo con un Intent, Ej 15).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>filesDir</code> = carpeta privada de la app, sin permisos.</li>
+    <li>Tres casos distintos: <code>NoExiste</code>, <code>Leido(texto)</code> y excepción (falla real).</li>
+    <li>El Repository lee en <code>Dispatchers.IO</code> y recibe la carpeta, no la Activity.</li>
+    <li>El ViewModel pide y publica; la UI no toca archivos. Una fábrica construye el ViewModel con su Repository.</li>
+  </ol>
+</div>
+
 </body>
 </html>

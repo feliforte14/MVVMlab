@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 6: Repository, cambiar datos sin cambiar la pantalla
+# MvvmLab — Ejercicio 7: Leer un archivo de texto desde el Repository
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -17,59 +17,51 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej03-viewmodel` | 3 — Primer ViewModel, sin magia |
 | `ej04-stateflow` | 4 — StateFlow: la pantalla observa |
 | `ej05-validacion` | 5 — Validar sin esconder la regla en un botón |
-| **`ej06-repository`** | **6 — Repository: cambiar datos sin cambiar la pantalla** ← esta rama |
+| `ej06-repository` | 6 — Repository: cambiar datos sin cambiar la pantalla |
+| **`ej07-leer-archivo`** | **7 — Leer un archivo de texto desde el Repository** ← esta rama |
 
 ---
 
 ## Consigna
 
-Definir un contrato `NotaRepository` con operaciones para obtener, guardar y eliminar notas. Implementar primero una
-versión en memoria. El ViewModel sólo habla con el contrato. Decidir valor puntual vs `Flow` y justificarlo.
-**Desafío:** reemplazar la implementación por otra lista precargada sin modificar el composable.
+Crear `ArchivoTextoRepository` para leer `borrador.txt` desde `filesDir`. Si no existe, devolver texto vacío o un resultado
+explícito (documentar la decisión). El ViewModel solicita la lectura y publica el resultado. No abrir el archivo desde un
+composable. Distinguir archivo inexistente de una falla real; `Dispatchers.IO`; sin referencias a la Activity.
+
+> Los Ej 7–9 de la guía trabajan sobre **un único borrador de texto**: en esta rama la app es un editor de borrador.
 
 ## Archivos
 
-| Archivo | Capa | Cambio |
+| Archivo | Capa | Contenido |
 |---|---|---|
-| `NotaRepository.kt` | Datos | **Nuevo**: `interface NotaRepository` + `NotaRepositoryEnMemoria` + `NotaRepositoryDeEjemplo` (desafío) |
-| `NotaViewModel.kt` | ViewModel | Recibe `NotaRepository` por constructor; carga en `init`, `onGuardar` y `onEliminar` delegan al Repository |
-| `NotaUiState.kt` | Estado | `Nota` con `id`; estado con `notas: List<Nota>` |
-| `PantallaNota.kt` | View | `LazyColumn` con formulario + lista; `FilaNota` reutilizable; callback `onEliminar` |
+| `BorradorRepository.kt` | Datos | `sealed interface ResultadoLectura` (`NoExiste` / `Leido`), `interface BorradorRepository`, `ArchivoTextoRepository(carpeta: File)` |
+| `BorradorViewModel.kt` | ViewModel | `BorradorUiState`, `BorradorViewModel` (lee en `init`), `Factory` con `viewModelFactory` |
+| `PantallaBorrador.kt` | View | Editor sin estado + 2 previews |
+| `MainActivity.kt` | — | `by viewModels { BorradorViewModel.Factory }` |
 
-## Contrato
+## Decisión documentada
 
-```kotlin
-interface NotaRepository {
-    suspend fun obtenerTodas(): List<Nota>
-    suspend fun guardar(nota: Nota)      // si ya existe ese id, la reemplaza
-    suspend fun eliminar(id: String)
-}
-
-class NotaViewModel(
-    private val repositorio: NotaRepository = NotaRepositoryEnMemoria()   // único lugar donde se elige
-) : ViewModel()
-```
-
-## Decisión: valor puntual (`suspend`) y no `Flow`
-
-Devuelve una "foto" de las notas; después de guardar o eliminar, el ViewModel vuelve a pedirla (`recargarNotas()`).
-Es simple y alcanza con **una sola pantalla**. `Flow` conviene cuando varias pantallas observan los mismos datos o la
-fuente ya emite cambios (Room) → se adopta en el Ej 12.
+Si el archivo **no existe** se devuelve el resultado explícito `ResultadoLectura.NoExiste` (no `""`): "no existe" y "existe
+pero vacío" son situaciones distintas. Una **falla real** se informa con una excepción (`IOException`), que el ViewModel
+captura y muestra como error.
 
 ## Pruebas (emulador)
 
 | Prueba | Resultado |
 |---|---|
-| Agregar 2 notas | "Notas guardadas (2)" ✅ |
-| Eliminar una | "Notas guardadas (1)" ✅ |
-| Cambiar una línea a `NotaRepositoryDeEjemplo()` | 3 notas precargadas, `PantallaNota.kt` sin cambios ✅ |
+| Sin `borrador.txt` | "Todavía no hay borrador guardado" ✅ |
+| Archivo creado con `adb shell run-as` (3 líneas, tildes, ñ) | Aparece completo al abrir ✅ |
+| `borrador.txt` reemplazado por una carpeta | "No se pudo leer el borrador", Logcat `EISDIR`, sin cierre ✅ |
+
+**Desafío — Device Explorer:** `data/data/com.example.mvvmlab/files/borrador.txt`
+(o `adb shell run-as com.example.mvvmlab cat files/borrador.txt`).
 
 ## Preguntas de la guía
 
-**¿Qué conoce el Repository sobre Compose?** Nada: recibe y devuelve `Nota` (Kotlin puro).
+**¿Dónde está físicamente el archivo?** `/data/data/com.example.mvvmlab/files/borrador.txt`, almacenamiento interno privado.
 
-**¿Por qué esta interfaz ayuda a probar la app?** El ViewModel depende del contrato: en un test se le pasa un
-Repository falso (datos fijos o fallas a propósito) sin archivos ni base de datos (Ej 13).
+**¿Otra app puede leerlo sin más?** No: cada app tiene su propio usuario Linux y su carpeta privada (sandbox).
 
 ## Criterio de finalización
-- ✅ La implementación concreta se puede cambiar sin reescribir la pantalla.
+- ✅ Una nota escrita previamente en el archivo aparece al abrir la pantalla.
+- ✅ La UI no accede al sistema de archivos.

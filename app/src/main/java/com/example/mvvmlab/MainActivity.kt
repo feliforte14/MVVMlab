@@ -13,13 +13,9 @@ import com.example.mvvmlab.ui.theme.MvvmLabTheme
 
 class MainActivity : ComponentActivity() {
 
-    // Mecanismo apropiado para obtener el ViewModel (Ej 3):
-    // "by viewModels()" NO crea uno nuevo cada vez. Le pide a Android el
-    // ViewModel asociado a esta Activity: la primera vez lo crea, y si la
-    // Activity se recrea (rotacion) devuelve EL MISMO.
-    // Nunca hacer NotaViewModel() a mano: se crearia uno nuevo en cada
-    // recreacion y se perderia el estado.
-    private val notaViewModel: NotaViewModel by viewModels()
+    // by viewModels { Factory }: igual que antes, pero indicando la fabrica
+    // que sabe construir el ViewModel con su repositorio.
+    private val borradorViewModel: BorradorViewModel by viewModels { BorradorViewModel.Factory }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,9 +23,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MvvmLabTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    // La Activity no valida ni guarda: solo conecta el VM con la pantalla.
-                    PantallaNotaConViewModel(
-                        viewModel = notaViewModel,
+                    PantallaBorradorConViewModel(
+                        viewModel = borradorViewModel,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
