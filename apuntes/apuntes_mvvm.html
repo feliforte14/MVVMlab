@@ -293,5 +293,191 @@ no se puede consultar ni recuperar.</p>
   ✅ La pantalla se representa a partir de un único estado (<code>NotaUiState</code>): lo prueban las 4 previews, que dibujan cualquier situación sin ejecutar la app.
 </div>
 
+
+<h2 class="salto">Ejercicio 2 — Explicación paso a paso</h2>
+<p>Recorrido de <code>Ej02PantallaNota.kt</code> en el mismo orden en que está escrito el archivo.</p>
+
+<h3>Paso 0 · ¿Qué problema resuelve?</h3>
+<p>En el Ej 1 la pantalla tenía variables sueltas (<code>texto</code>, <code>tareas</code>, <code>error</code>): para saber qué se estaba viendo había que mirar
+tres cosas por separado, y cualquier parte del código podía cambiar cualquiera de ellas. La idea del Ej 2 es juntar todo en
+<strong>un solo objeto</strong>, el <em>estado de pantalla</em>. Si tenés ese objeto, sabés exactamente cómo se ve la pantalla: <strong>UI = f(estado)</strong>.</p>
+
+<div class="bloque">
+<h3>Paso 1 · <code>Nota</code>: el dato</h3>
+<pre>data class Nota(
+    val titulo: String,
+    val contenido: String
+)</pre>
+<p>Representa una <strong>nota ya guardada</strong>: el dato real, el que en ejercicios futuros va a ir al archivo.
+<code>data class</code> = clase cuyo propósito es guardar datos; Kotlin le genera <code>equals</code> (comparar), <code>toString</code> (imprimir) y
+<code>copy</code> (copiar cambiando algo). <code>val</code> = no se puede reasignar.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 2 · <code>NotaUiState</code>: la “foto” de la pantalla</h3>
+<table>
+  <tr><th style="width:18%">Campo</th><th>Pregunta que responde</th><th style="width:36%">Qué dibuja</th></tr>
+  <tr><td><code>titulo</code></td><td>¿Qué hay escrito en el campo título?</td><td>El texto dentro del campo</td></tr>
+  <tr><td><code>contenido</code></td><td>¿Qué hay escrito en el campo contenido?</td><td>El texto dentro del campo</td></tr>
+  <tr><td><code>error</code></td><td>¿Hay un error de validación?</td><td>El mensaje rojo debajo del título</td></tr>
+  <tr><td><code>guardando</code></td><td>¿Se está guardando ahora?</td><td>Botón “Guardando...” y deshabilitado</td></tr>
+  <tr><td><code>guardada</code></td><td>¿Cuál es la última nota guardada?</td><td>La tarjeta de abajo</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong><code>String?</code> y <code>Nota?</code></strong>: el <code>?</code> significa que puede ser <code>null</code> (puede no haber error, o ninguna nota guardada todavía).</li>
+  <li><strong>Valores por defecto</strong> (<code>= ""</code>, <code>= null</code>, <code>= false</code>): por eso <code>NotaUiState()</code> sin parámetros es el estado inicial, la pantalla vacía.</li>
+  <li><strong>Todo es <code>val</code></strong>: el estado no se modifica, se <strong>reemplaza por uno nuevo</strong> con <code>copy</code>.</li>
+</ul>
+<pre>val antes = NotaUiState(titulo = "Hola")
+val despues = antes.copy(error = "algo")   // mismo título, pero con error
+// "antes" no cambió. "despues" es un objeto NUEVO.</pre>
+<p>¿Por qué así? Compose redibuja cuando el estado es <strong>reemplazado por otro distinto</strong>. Si se modificara un objeto por dentro, Compose podría no enterarse.</p>
+
+<div class="caja clave">
+  <strong class="titulo">La propiedad calculada <code>hayCambiosSinGuardar</code></strong>
+  No está entre los paréntesis: no se guarda, <strong>se calcula</strong> cada vez que alguien la lee, comparando <code>titulo</code>/<code>contenido</code> con <code>guardada</code>.
+  Si fuera un campo más habría que acordarse de actualizarlo cada vez que cambia el título, el contenido o la nota guardada; un olvido y la pantalla
+  muestra algo falso. Calculada, <strong>no puede quedar desincronizada nunca</strong>.
+</div>
+
+<h3>Paso 3 · Los eventos: “qué pasa cuando...”</h3>
+<p>Son el corazón del ejercicio. Todas tienen la misma forma: <strong>reciben el estado actual → devuelven el estado nuevo</strong>.</p>
+<table>
+  <tr><th style="width:44%">Función</th><th>Qué hace</th></tr>
+  <tr><td><code>alEditarTitulo(estado, nuevo)</code><br><code>= estado.copy(titulo = nuevo, error = null)</code></td><td>Actualiza el título y <strong>borra el error</strong>: si decía “El título no puede estar vacío” y el usuario empieza a escribir, ese mensaje ya no tiene sentido.</td></tr>
+  <tr><td><code>alEditarContenido(estado, nuevo)</code><br><code>= estado.copy(contenido = nuevo)</code></td><td>Solo cambia el contenido.</td></tr>
+  <tr><td><code>alPulsarGuardar(estado)</code></td><td><code>when</code> evalúa en orden y usa la primera condición que se cumpla:
+    1) ¿ya se está guardando? → no hace nada; 2) ¿título vacío o solo espacios? → pone el error; 3) si no → <code>guardando = true</code>.</td></tr>
+  <tr><td><code>alTerminarGuardado(estado)</code></td><td>Deja de estar “guardando” y lo escrito pasa a ser la <code>guardada</code>.</td></tr>
+</table>
+<div class="caja regla">
+  <strong class="titulo">Lo clave</strong>
+  Ninguna tiene <code>@Composable</code>, ni <code>Text</code>, ni nada de pantalla: <strong>son Kotlin puro</strong>. Son las reglas que en el Ej 1 dijimos que van al
+  <strong>ViewModel</strong>. En el Ej 3 se mudan ahí casi sin cambios.
+</div>
+
+<div class="bloque">
+<h3>Paso 4 · <code>PantallaNota</code>: la View</h3>
+<pre>@Composable
+fun PantallaNota(
+    estado: NotaUiState,                  // lo que tiene que dibujar  → el estado BAJA
+    onTituloChange: (String) -&gt; Unit,     // funciones para AVISAR     → los eventos SUBEN
+    onContenidoChange: (String) -&gt; Unit,
+    onGuardar: () -&gt; Unit,
+    modifier: Modifier = Modifier
+)</pre>
+</div>
+<div class="caja clave">
+  <strong class="titulo">¿Qué es <code>(String) -&gt; Unit</code>?</strong>
+  El <strong>tipo</strong> de una función: “recibe un String y no devuelve nada” (<code>Unit</code> ≈ <code>void</code> de Java). <code>() -&gt; Unit</code> no recibe nada
+  y no devuelve nada. A <code>PantallaNota</code> se le pasan <strong>funciones como parámetros</strong>, y ella las llama cuando el usuario hace algo.
+</div>
+<p>Adentro, cada pieza lee del estado:</p>
+<pre>OutlinedTextField(
+    value = estado.titulo,                               // muestra lo que dice el estado
+    onValueChange = onTituloChange,                      // cuando el usuario escribe, AVISA
+    isError = estado.error != null,                      // si hay error, borde rojo
+    supportingText = { estado.error?.let { Text(it) } }  // y el mensaje
+)
+Button(
+    onClick = onGuardar,                                 // cuando aprieta, AVISA
+    enabled = !estado.guardando                          // deshabilitado mientras guarda
+) { Text(if (estado.guardando) "Guardando..." else "Guardar") }</pre>
+<p><strong>Lo que NO hace:</strong> no valida, no guarda, no decide nada. Si el usuario escribe, no cambia el título: solo avisa “escribieron esto”.
+Esto se llama <strong>state hoisting</strong> (elevar el estado): la pantalla no es dueña de su estado, lo recibe desde arriba.</p>
+
+<div class="bloque">
+<h3>Paso 5 · <code>PantallaNotaConEstado</code>: el dueño (provisorio)</h3>
+<pre>@Composable
+fun PantallaNotaConEstado(modifier: Modifier = Modifier) {
+    var estado by remember { mutableStateOf(NotaUiState()) }
+    val scope = rememberCoroutineScope()
+
+    PantallaNota(
+        estado = estado,
+        onTituloChange = { estado = alEditarTitulo(estado, it) },
+        onContenidoChange = { estado = alEditarContenido(estado, it) },
+        onGuardar = { ... },
+    )
+}</pre>
+</div>
+<ul>
+  <li><code>mutableStateOf</code>: Compose <strong>observa</strong> esta variable; cuando cambia, redibuja.</li>
+  <li><code>remember</code>: hace que el valor <strong>no se pierda</strong> cuando Compose redibuja.</li>
+  <li><code>{ estado = alEditarTitulo(estado, it) }</code> es una <strong>lambda</strong> (función sin nombre); <code>it</code> es el parámetro que recibe (el texto nuevo).
+  Se lee: “cuando cambie el título, reemplazá el estado por el resultado de <code>alEditarTitulo</code>”.</li>
+  <li>En el Ej 3 este rol (dueño del estado) lo toma el <strong>ViewModel</strong>.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 6 · El guardado simulado</h3>
+<pre>onGuardar = {
+    estado = alPulsarGuardar(estado)            // 1. aplicar la regla
+    if (estado.guardando) {                     // 2. ¿pasó la validación?
+        scope.launch {                          // 3. arrancar tarea en segundo plano
+            delay(1500)                         // 4. esperar 1,5 s (simula el disco)
+            estado = alTerminarGuardado(estado) // 5. listo
+        }
+    }
+}</pre>
+<p>¿Por qué <code>scope.launch</code>? Si se esperara 1,5 s “normalmente”, <strong>la pantalla se congelaría</strong>. <code>launch</code> arranca una
+<strong>corrutina</strong>: una tarea que espera sin bloquear la pantalla. Por ahora alcanza con: <em>“launch + delay = esperar sin congelar la app”</em> (se profundiza en el Ej 9).</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 7 · Recorrido completo de un click</h3>
+<p>Título “Parcial” escrito, el usuario aprieta <strong>Guardar</strong>:</p>
+<pre>1. VIEW      Button → llama onGuardar()                              (EVENTO sube)
+2. DUEÑO     estado = alPulsarGuardar(estado)
+3. REGLA     título "Parcial" no está vacío → copy(guardando = true)
+4. COMPOSE   detecta estado nuevo → redibuja PantallaNota
+5. VIEW      lee estado.guardando = true → botón "Guardando..." deshabilitado
+                                                                     (ESTADO baja)
+   ... 1,5 segundos ...
+6. DUEÑO     estado = alTerminarGuardado(estado)
+7. REGLA     copy(guardando = false, guardada = Nota("Parcial", ""))
+8. COMPOSE   redibuja
+9. VIEW      botón vuelve a "Guardar" + aparece la tarjeta "Última nota guardada"</pre>
+<p><strong>Nadie toca la pantalla directamente.</strong> Solo se cambia el estado, y la pantalla se redibuja sola a partir de él.</p>
+</div>
+
+<div class="bloque">
+<h3>Paso 8 · Los Previews</h3>
+<pre>@Preview(name = "2. Error de validación")
+@Composable
+fun PantallaNotaErrorPreview() {
+    MvvmLabTheme {
+        PantallaNota(
+            NotaUiState(
+                contenido = "Texto sin título",
+                error = "El título no puede estar vacío"
+            ),
+            {}, {}, {}
+        )
+    }
+}</pre>
+<p>Como <code>PantallaNota</code> solo dibuja lo que le pasan, se puede armar un estado a mano con cualquier situación y <strong>verla sin correr la app</strong>.
+Los <code>{}</code> son lambdas vacías: en el preview los botones no necesitan hacer nada. Es la <strong>prueba del criterio de finalización</strong>:
+si cualquier situación se dibuja pasando solo un <code>NotaUiState</code>, la pantalla se representa a partir de un único estado.</p>
+</div>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><strong><code>NotaUiState</code></strong> = todo lo que la pantalla necesita, en un objeto. Inmutable: se cambia con <code>copy</code>.</li>
+    <li><strong>Funciones de evento</strong> = reglas puras <em>estado → estado nuevo</em>. Sin Compose. En el Ej 3 van al ViewModel.</li>
+    <li><strong><code>PantallaNota</code></strong> = View sin estado. Recibe <code>estado</code> (baja) y callbacks (suben). No decide nada.</li>
+    <li><strong><code>PantallaNotaConEstado</code></strong> = dueño provisorio del estado. Conecta eventos con reglas.</li>
+    <li><strong>Nunca se toca la pantalla</strong>: se cambia el estado y Compose redibuja.</li>
+  </ol>
+</div>
+
+<div class="caja ojo">
+  <strong class="titulo">Para comprobar que se entendió</strong>
+  Si en <code>alEditarTitulo</code> se sacara el <code>error = null</code> y quedara solo <code>estado.copy(titulo = nuevo)</code>, ¿qué pasaría en la pantalla
+  al apretar Guardar con el título vacío y después empezar a escribir?
+</div>
+
 </body>
 </html>
