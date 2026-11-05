@@ -1,9 +1,11 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.fake
 
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onStart
-import java.io.IOException
 
 // =====================================================================
 // EJERCICIO 13 — Repository FALSO para pruebas

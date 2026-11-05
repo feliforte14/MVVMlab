@@ -28,6 +28,59 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── MvvmLabApp.kt
+ ├── core/
+ │   ├── model/
+ │   │   ├── EstadoCarga.kt
+ │   ├── navigation/
+ │   │   ├── Rutas.kt
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── ArchivoNotasRepository.kt
+ │   │   ├── NotaRepositoryEnMemoria.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ │   ├── repository/
+ │   │   ├── NotaRepository.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorNota.kt
+ ├── presentation/
+ │   ├── AppNotas.kt
+ │   ├── detalle/
+ │   │   ├── DetalleNotaViewModel.kt
+ │   │   ├── DetalleUiState.kt
+ │   │   ├── PantallaDetalle.kt
+ │   ├── lista/
+ │   │   ├── ListaNotasViewModel.kt
+ │   │   ├── ListaUiState.kt
+ │   │   ├── PantallaLista.kt
+ ├── di/
+ │   ├── ContenedorApp.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/
+ │   ├── validacion/
+ │   │   ├── ValidadorNotaTest.kt
+ ├── presentation/
+ │   ├── NotasViewModelTest.kt
+ ├── fake/
+ │   ├── FakeNotaRepository.kt
+ ├── util/
+ │   ├── MainDispatcherRule.kt
+```
+
 ## Consigna
 
 Construir un Repository falso para pruebas, con datos prefijados y posibilidad de provocar una falla. Escribir pruebas del
@@ -38,10 +91,10 @@ ViewModel para carga inicial, validación, guardado correcto y error de escritur
 
 | Archivo | Contenido |
 |---|---|
-| `FakeNotaRepository.kt` | Implementa `NotaRepository`: datos prefijados, `fallarLectura` / `fallarEscritura`, registro `guardadas` / `eliminadas` |
-| `MainDispatcherRule.kt` | Reemplaza `Dispatchers.Main` por `UnconfinedTestDispatcher` en cada test |
-| `NotasViewModelTest.kt` | 9 tests de `ListaNotasViewModel` y `DetalleNotaViewModel` |
-| `ValidadorNotaTest.kt` | 5 tests del Ej 5 |
+| `fake/FakeNotaRepository.kt` | Implementa `NotaRepository`: datos prefijados, `fallarLectura` / `fallarEscritura`, registro `guardadas` / `eliminadas` |
+| `util/MainDispatcherRule.kt` | Reemplaza `Dispatchers.Main` por `UnconfinedTestDispatcher` en cada test |
+| `presentation/NotasViewModelTest.kt` | 9 tests de `ListaNotasViewModel` y `DetalleNotaViewModel` |
+| `domain/validacion/ValidadorNotaTest.kt` | 5 tests del Ej 5 |
 
 Gradle: `testImplementation(kotlinx-coroutines-test 1.9.0)` (misma versión de corrutinas del proyecto) y
 `unitTests.isReturnDefaultValues = true` (para que `android.util.Log` no rompa los tests JVM).

@@ -1,6 +1,13 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.mvvmlab.core.model.EstadoCarga
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
+import com.example.mvvmlab.fake.FakeNotaRepository
+import com.example.mvvmlab.presentation.detalle.DetalleNotaViewModel
+import com.example.mvvmlab.presentation.lista.ListaNotasViewModel
+import com.example.mvvmlab.util.MainDispatcherRule
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

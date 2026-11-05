@@ -1,5 +1,9 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.data.repository
 
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
+import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,30 +15,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import java.io.File
-import java.io.IOException
-
-data class Nota(
-    val id: String,
-    val titulo: String,
-    val contenido: String
-)
-
-// =====================================================================
-// EJERCICIO 12 — Contrato con Flow: UNA fuente de verdad para 2 pantallas
-// =====================================================================
-// En el Ej 6 elegimos "valor puntual" (obtenerTodas) porque habia UNA
-// pantalla. Ahora hay dos (lista y detalle): si cada una pidiera su
-// "foto" por separado, la lista no se enteraria de lo que guardo el
-// detalle. Con observarTodas(): Flow, el Repository EMITE la lista cada
-// vez que cambia, y la lista se actualiza sola al volver.
-// =====================================================================
-interface NotaRepository {
-    fun observarTodas(): Flow<List<Nota>>    // emite la lista actual y cada cambio
-    suspend fun obtener(id: String): Nota?   // una nota puntual (para el detalle)
-    suspend fun guardar(nota: Nota)          // alta o edicion
-    suspend fun eliminar(id: String)
-}
 
 class FormatoInvalidoException(mensaje: String, causa: Throwable? = null) : IOException(mensaje, causa)
 
