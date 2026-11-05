@@ -21,7 +21,7 @@
   th { background: var(--azul-claro); }
   code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f2f4f8; padding: 0 3px; border-radius: 3px; }
   pre { font-family: "SF Mono", Menlo, monospace; font-size: 8.4pt; background: #f6f7fa; border: 1px solid var(--borde);
-        border-radius: 6px; padding: 9px 11px; overflow-x: auto; white-space: pre; page-break-inside: avoid; margin: 8px 0; }
+        border-radius: 6px; padding: 9px 11px; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; page-break-inside: avoid; margin: 8px 0; }
   .caja { border-radius: 6px; padding: 8px 12px; margin: 10px 0; page-break-inside: avoid; }
   .clave { background: var(--azul-claro); border-left: 4px solid var(--azul); }
   .regla { background: var(--verde-claro); border-left: 4px solid var(--verde); }
@@ -46,6 +46,47 @@
   <p>Desarrollo de Aplicaciones I · UADE · Guía de Ejercicios: MVVM y Repository (v1.0)</p>
   <p>Proyecto: <code>MvvmLab</code> · Felipe Forte</p>
 </header>
+
+<h2>Organización del proyecto en carpetas</h2>
+<p>El código está organizado por <strong>capas</strong>, con la misma estructura que el repositorio de referencia
+<em>PokedexAcademy-MVVM-Clean</em>. Cada carpeta es un <em>paquete</em> de Kotlin (<code>com.example.mvvmlab.presentation.nota</code>, etc.).
+En cada rama aparecen solo las carpetas que ese ejercicio usa.</p>
+<pre>app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt          # punto de entrada: aloja la UI
+ ├── MvvmLabApp.kt            # Application propia (desde el Ej 11)
+ ├── core/
+ │    ├── model/              # tipos comunes a varias pantallas (EstadoCarga)
+ │    ├── navigation/         # rutas de navegación (desde el Ej 12)
+ │    ├── theme/              # tema de Compose (Color, Theme, Type)
+ │    └── util/               # utilidades (Fechas)
+ ├── data/                    # CÓMO se guardan los datos
+ │    ├── local/              # Room: Entity, DAO, Database (Ej 14–15)
+ │    ├── mapper/             # Entity ⇄ modelo de dominio
+ │    └── repository/         # implementaciones de los contratos (memoria, archivos, Room)
+ ├── domain/                  # QUÉ es la app: Kotlin puro, sin Android
+ │    ├── model/              # Nota, Registro, ResultadoLectura
+ │    ├── repository/         # contratos (interfaces) de los Repository
+ │    └── validacion/         # reglas de negocio (ValidadorNota, ValidadorRegistro)
+ ├── presentation/            # MVVM: una carpeta por pantalla (UiState + ViewModel + Pantalla)
+ └── di/                      # quién crea las dependencias (ContenedorApp, Ej 11)
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/validacion/       # tests de reglas
+ ├── fake/                    # Repository falsos para tests
+ ├── presentation/            # tests de ViewModels
+ └── util/                    # MainDispatcherRule</pre>
+<table>
+  <tr><th style="width:22%">Capa</th><th>Regla</th></tr>
+  <tr><td><code>domain/</code></td><td>No importa nada de Android, Compose, Room ni archivos. Define los datos (<code>model</code>), los contratos (<code>repository</code>) y las reglas (<code>validacion</code>).</td></tr>
+  <tr><td><code>data/</code></td><td>Implementa los contratos de <code>domain</code>. Es la única capa que conoce archivos, SQL o Room.</td></tr>
+  <tr><td><code>presentation/</code></td><td>ViewModels y pantallas. Solo habla con los contratos de <code>domain</code>, nunca con <code>data</code> directamente.</td></tr>
+  <tr><td><code>di/</code></td><td>Conecta todo: elige qué implementación de <code>data</code> recibe cada ViewModel.</td></tr>
+</table>
+<div class="caja ojo">
+  <strong class="titulo">¿Y los <em>use cases</em> del repositorio de referencia?</strong>
+  El repositorio de referencia tiene además <code>domain/usecase/</code>. Acá no se agregaron: la guía pide no crear capas “porque sí”, y en estos
+  ejercicios cada use case solo llamaría a un método del Repository. La teoría (diapositiva 4) aclara que la capa de dominio es opcional.
+</div>
 
 <h2>Ejercicio 1 — ¿Quién está haciendo demasiado?</h2>
 
@@ -195,7 +236,7 @@ Es decir, todo lo que va en ViewModel y Repository.</p>
 <p><strong>Consigna:</strong> pantalla de notas con título, contenido y botón Guardar. Definir una <code>data class</code> de estado
 de pantalla con el contenido actual, el error de validación y si hay una operación en curso. Simular el guardado.
 Identificar eventos separados para editar el título, editar el texto y pulsar Guardar. Todavía <strong>sin ViewModel</strong>.
-<br>Archivo: <code>Ej02PantallaNota.kt</code> · Rama: <code>ej02-estado-pantalla</code></p>
+<br>Archivo: <code>domain/model/Nota.kt + presentation/nota/</code> · Rama: <code>ej02-estado-pantalla</code></p>
 
 <div class="caja clave">
   <strong class="titulo">Estado de pantalla (UiState)</strong>
@@ -298,7 +339,7 @@ no se puede consultar ni recuperar.</p>
 
 
 <h2 class="salto">Ejercicio 2 — Explicación paso a paso</h2>
-<p>Recorrido de <code>Ej02PantallaNota.kt</code> en el mismo orden en que está escrito el archivo.</p>
+<p>Recorrido del código del Ej 2, capa por capa: <code>domain/model/Nota.kt</code> (dato), <code>presentation/nota/NotaUiState.kt</code> (estado), <code>presentation/nota/NotaEventos.kt</code> (eventos) y <code>presentation/nota/PantallaNota.kt</code> (View).</p>
 
 <h3>Paso 0 · ¿Qué problema resuelve?</h3>
 <p>En el Ej 1 la pantalla tenía variables sueltas (<code>texto</code>, <code>tareas</code>, <code>error</code>): para saber qué se estaba viendo había que mirar
@@ -488,7 +529,7 @@ si cualquier situación se dibuja pasando solo un <code>NotaUiState</code>, la p
 <p><strong>Consigna:</strong> mover la lógica del ejercicio anterior a una clase que extienda <code>ViewModel</code>. La pantalla recibe estado y
 funciones de evento, sin decidir cómo se guarda una nota. Obtener el ViewModel con el mecanismo apropiado del proyecto y comprobar qué sucede al
 rotar el emulador. <strong>Desafío:</strong> contador de intentos de guardado para observar la vida del ViewModel.
-<br>Rama: <code>ej03-viewmodel</code> · Archivos: <code>NotaViewModel.kt</code> (ViewModel), <code>NotaUiState.kt</code> (modelo y estado), <code>PantallaNota.kt</code> (View)</p>
+<br>Rama: <code>ej03-viewmodel</code> · Archivos: <code>presentation/nota/NotaViewModel.kt</code> (ViewModel), <code>presentation/nota/NotaUiState.kt</code> (modelo y estado), <code>presentation/nota/PantallaNota.kt</code> (View)</p>
 
 <h3>Paso 0 · ¿Qué problema resuelve?</h3>
 <p>En el Ej 2 el dueño del estado era un composable con <code>remember</code>. <code>remember</code> vive mientras vive <strong>la pantalla</strong>.
@@ -674,7 +715,7 @@ archivo o Room (Ej 6 en adelante).</p>
 <p><strong>Consigna:</strong> exponer desde el ViewModel un <code>StateFlow</code> de sólo lectura y mantener mutable su implementación. En Compose
 recolectarlo con la API consciente del ciclo de vida (<code>collectAsStateWithLifecycle</code>). Hacer que editar un campo cambie el estado visible.
 <strong>Desafío:</strong> registrar cambios puntuales y comprobar que editar un campo no borra el otro.
-<br>Rama: <code>ej04-stateflow</code> · Archivo principal: <code>NotaViewModel.kt</code></p>
+<br>Rama: <code>ej04-stateflow</code> · Archivo principal: <code>presentation/nota/NotaViewModel.kt</code></p>
 
 <h3>Paso 0 · ¿Qué cambia respecto del Ej 3?</h3>
 <p>En el Ej 3 el estado era un <code>mutableStateOf</code> (una API <strong>de Compose</strong>) dentro del ViewModel. Funciona, pero ata el ViewModel a Compose.
@@ -772,7 +813,7 @@ Compose redibuja solo lo que depende de valores que cambiaron: al escribir en el
 <p><strong>Consigna:</strong> agregar reglas: título no vacío, contenido de al menos diez caracteres y prohibición de guardar dos veces mientras se
 procesa una solicitud. Ubicar las reglas fuera de la vista. Mostrar errores cerca de los campos, sin diálogos para cada tecla.
 <strong>Desafío:</strong> probar espacios en blanco, una nota válida y dos pulsaciones seguidas.
-<br>Rama: <code>ej05-validacion</code> · Archivos nuevos: <code>ValidadorNota.kt</code>, <code>ValidadorNotaTest.kt</code></p>
+<br>Rama: <code>ej05-validacion</code> · Archivos nuevos: <code>domain/validacion/ValidadorNota.kt</code>, <code>domain/validacion/ValidadorNotaTest.kt</code></p>
 
 <h3>Paso 0 · El problema: la regla “escondida” en el botón</h3>
 <p>Si la validación se escribe dentro del <code>onClick</code> del botón (como en la pantalla del Ej 1), la regla queda mezclada con la interfaz:
@@ -877,7 +918,7 @@ molesta; no limpiarlo nunca deja un mensaje desactualizado mientras el usuario y
 <p><strong>Consigna:</strong> definir un contrato <code>NotaRepository</code> con operaciones para obtener, guardar y eliminar notas. Implementar primero
 una versión en memoria. El ViewModel sólo habla con el contrato. Decidir si el resultado se devuelve como valor puntual o como <code>Flow</code> y justificarlo.
 <strong>Desafío:</strong> reemplazar la implementación por otra lista precargada sin modificar el composable.
-<br>Rama: <code>ej06-repository</code> · Archivo nuevo: <code>NotaRepository.kt</code></p>
+<br>Rama: <code>ej06-repository</code> · Archivo nuevo: <code>domain/repository/NotaRepository.kt</code></p>
 
 <h3>Paso 0 · ¿Para qué un Repository?</h3>
 <p>Hasta el Ej 5 el ViewModel “simulaba” guardar. Pero el ViewModel no debería saber <em>dónde</em> se guardan los datos (memoria, archivo, base de datos,
@@ -995,7 +1036,7 @@ class NotaRepositoryDeEjemplo : NotaRepository {           // desafío: precarga
   <tr><th>Prueba</th><th>Resultado</th></tr>
   <tr><td>Agregar “Parcial DA1” y “Compras”</td><td>“Notas guardadas (2)”, ambas en la lista ✅</td></tr>
   <tr><td>Eliminar “Parcial DA1”</td><td>“Notas guardadas (1)”, queda “Compras” ✅</td></tr>
-  <tr><td>Cambiar <em>una línea</em> del ViewModel a <code>NotaRepositoryDeEjemplo()</code></td><td>Arranca con 3 notas precargadas; <code>PantallaNota.kt</code> sin cambios ✅</td></tr>
+  <tr><td>Cambiar <em>una línea</em> del ViewModel a <code>NotaRepositoryDeEjemplo()</code></td><td>Arranca con 3 notas precargadas; <code>presentation/nota/PantallaNota.kt</code> sin cambios ✅</td></tr>
 </table>
 
 <h3>Preguntas de la guía</h3>
@@ -1015,6 +1056,7 @@ que falle a propósito, sin archivos ni base de datos, y comprobar las reglas de
     <li>Valor puntual + recargar después de escribir: simple mientras haya una sola pantalla.</li>
   </ol>
 </div>
+
 
 </body>
 </html>

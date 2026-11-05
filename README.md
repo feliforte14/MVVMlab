@@ -21,6 +21,41 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── data/
+ │   ├── repository/
+ │   │   ├── NotaRepositoryDeEjemplo.kt
+ │   │   ├── NotaRepositoryEnMemoria.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ │   ├── repository/
+ │   │   ├── NotaRepository.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorNota.kt
+ ├── presentation/
+ │   ├── nota/
+ │   │   ├── NotaUiState.kt
+ │   │   ├── NotaViewModel.kt
+ │   │   ├── PantallaNota.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/
+ │   ├── validacion/
+ │   │   ├── ValidadorNotaTest.kt
+```
+
 ## Consigna
 
 Definir un contrato `NotaRepository` con operaciones para obtener, guardar y eliminar notas. Implementar primero una
@@ -31,10 +66,10 @@ versión en memoria. El ViewModel sólo habla con el contrato. Decidir valor pun
 
 | Archivo | Capa | Cambio |
 |---|---|---|
-| `NotaRepository.kt` | Datos | **Nuevo**: `interface NotaRepository` + `NotaRepositoryEnMemoria` + `NotaRepositoryDeEjemplo` (desafío) |
-| `NotaViewModel.kt` | ViewModel | Recibe `NotaRepository` por constructor; carga en `init`, `onGuardar` y `onEliminar` delegan al Repository |
-| `NotaUiState.kt` | Estado | `Nota` con `id`; estado con `notas: List<Nota>` |
-| `PantallaNota.kt` | View | `LazyColumn` con formulario + lista; `FilaNota` reutilizable; callback `onEliminar` |
+| `domain/repository/NotaRepository.kt` | Datos | **Nuevo**: `interface NotaRepository` + `NotaRepositoryEnMemoria` + `NotaRepositoryDeEjemplo` (desafío) |
+| `presentation/nota/NotaViewModel.kt` | ViewModel | Recibe `NotaRepository` por constructor; carga en `init`, `onGuardar` y `onEliminar` delegan al Repository |
+| `presentation/nota/NotaUiState.kt` | Estado | `Nota` con `id`; estado con `notas: List<Nota>` |
+| `presentation/nota/PantallaNota.kt` | View | `LazyColumn` con formulario + lista; `FilaNota` reutilizable; callback `onEliminar` |
 
 ## Contrato
 
@@ -62,7 +97,7 @@ fuente ya emite cambios (Room) → se adopta en el Ej 12.
 |---|---|
 | Agregar 2 notas | "Notas guardadas (2)" ✅ |
 | Eliminar una | "Notas guardadas (1)" ✅ |
-| Cambiar una línea a `NotaRepositoryDeEjemplo()` | 3 notas precargadas, `PantallaNota.kt` sin cambios ✅ |
+| Cambiar una línea a `NotaRepositoryDeEjemplo()` | 3 notas precargadas, `presentation/nota/PantallaNota.kt` sin cambios ✅ |
 
 ## Preguntas de la guía
 

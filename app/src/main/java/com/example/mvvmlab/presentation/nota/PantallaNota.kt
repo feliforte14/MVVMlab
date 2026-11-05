@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.nota
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,11 +15,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.domain.model.Nota
 
 // =====================================================================
 // VIEW (sin estado propio)
@@ -106,7 +109,6 @@ fun FilaNota(nota: Nota, onEliminar: () -> Unit, modifier: Modifier = Modifier) 
     }
 }
 
-
 // --- PREVIEWS ---------------------------------------------------------
 
 @Preview(showBackground = true, name = "1. Sin notas")
@@ -132,4 +134,18 @@ fun PantallaNotaConNotasPreview() {
             {}, {}, {}, {}
         )
     }
+}
+
+// --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
+@Composable
+fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
+    val estado by viewModel.uiState.collectAsStateWithLifecycle()
+    PantallaNota(
+        estado = estado,
+        onTituloChange = viewModel::onTituloChange,
+        onContenidoChange = viewModel::onContenidoChange,
+        onGuardar = viewModel::onGuardar,
+        onEliminar = viewModel::onEliminar,
+        modifier = modifier
+    )
 }

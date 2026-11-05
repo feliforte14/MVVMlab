@@ -1,17 +1,17 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.nota
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.example.mvvmlab.data.repository.NotaRepositoryEnMemoria
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.repository.NotaRepository
+import com.example.mvvmlab.domain.validacion.ValidadorNota
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 // Ej 6: el ViewModel recibe el Repository por constructor y SOLO conoce
 // el contrato (NotaRepository), no la implementacion concreta.
@@ -81,19 +81,4 @@ class NotaViewModel(
             recargarNotas()
         }
     }
-}
-
-
-// --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
-@Composable
-fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
-    val estado by viewModel.uiState.collectAsStateWithLifecycle()
-    PantallaNota(
-        estado = estado,
-        onTituloChange = viewModel::onTituloChange,
-        onContenidoChange = viewModel::onContenidoChange,
-        onGuardar = viewModel::onGuardar,
-        onEliminar = viewModel::onEliminar,
-        modifier = modifier
-    )
 }
