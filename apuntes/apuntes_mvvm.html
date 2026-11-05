@@ -35,6 +35,11 @@
   .figs { display:flex; gap:10px; align-items:flex-end; justify-content:center; margin:10px 0; break-inside: avoid; }
   .figs figure { margin:0; flex:0 0 auto; text-align:center; font-size:8.6pt; color:var(--gris); }
   .figs img { border:1px solid var(--borde); border-radius:6px; display:block; margin:0 auto 4px; }
+  
+  .pocas { background:#f3f0ff; border-left:4px solid #5b3fb8; }
+  .novato { background:#fff4ec; border-left:4px solid #c2561a; }
+  .novato ul { margin-bottom:0; }
+  .novato li { margin:4px 0; }
   .bloque { break-inside: avoid; page-break-inside: avoid; }
   h2, h3 { break-after: avoid; page-break-after: avoid; }
 </style>
@@ -47,7 +52,33 @@
   <p>Proyecto: <code>MvvmLab</code> · Felipe Forte</p>
 </header>
 
-<h2>Organización del proyecto en carpetas</h2>
+
+<h2 class="salto">Glosario para empezar</h2>
+<p>Palabras que aparecen en todos los ejercicios. Si alguna no se entiende en el medio de un ejercicio, volver acá.</p>
+<table>
+  <tr><th style="width:24%">Término</th><th>Qué significa, en simple</th></tr>
+  <tr><td><strong>Activity</strong></td><td>Una pantalla de Android. Android la crea y la destruye (por ejemplo, al rotar el teléfono). Nuestra app tiene una sola: <code>MainActivity</code>.</td></tr>
+  <tr><td><strong>Composable</strong></td><td>Función marcada con <code>@Composable</code> que <em>describe</em> un pedazo de pantalla. No devuelve nada: “emite” interfaz.</td></tr>
+  <tr><td><strong>Recomposición</strong></td><td>Cuando un dato que la pantalla usa cambia, Compose vuelve a ejecutar las funciones composables afectadas para redibujar.</td></tr>
+  <tr><td><strong>Estado</strong></td><td>Los datos que determinan cómo se ve la pantalla <em>ahora</em> (qué hay escrito, si hay un error, si está cargando).</td></tr>
+  <tr><td><strong>Evento</strong></td><td>Algo que pasó: un click, una tecla. Produce un cambio de estado.</td></tr>
+  <tr><td><strong>MVVM</strong></td><td>Forma de ordenar el código en tres partes: <strong>View</strong> (dibuja), <strong>ViewModel</strong> (decide y guarda el estado de pantalla) y <strong>Model</strong> (los datos y dónde se guardan).</td></tr>
+  <tr><td><strong>ViewModel</strong></td><td>Clase que guarda el estado de una pantalla y su lógica. Sobrevive a la rotación; no sobrevive a que Android cierre la app.</td></tr>
+  <tr><td><strong>Repository</strong></td><td>Clase que sabe <em>dónde</em> están los datos (memoria, archivo, base de datos) y ofrece operaciones como guardar o eliminar.</td></tr>
+  <tr><td><strong>Interface (contrato)</strong></td><td>Lista de funciones que una clase promete tener, sin decir cómo las hace. Permite cambiar la implementación sin tocar a quien la usa.</td></tr>
+  <tr><td><strong>data class</strong></td><td>Clase de Kotlin pensada para guardar datos. Trae gratis <code>copy</code>, <code>equals</code> y <code>toString</code>.</td></tr>
+  <tr><td><strong>val / var</strong></td><td><code>val</code> no se puede reasignar; <code>var</code> sí.</td></tr>
+  <tr><td><strong>null y <code>?</code></strong></td><td><code>null</code> = “no hay valor”. Un tipo con <code>?</code> (<code>String?</code>) puede ser null; Kotlin obliga a contemplarlo.</td></tr>
+  <tr><td><strong>Lambda</strong></td><td>Función sin nombre que se pasa como dato: <code>{ texto -&gt; println(texto) }</code>. Se usa para avisar eventos (<code>onClick = { ... }</code>).</td></tr>
+  <tr><td><strong>Corrutina</strong></td><td>Tarea que puede esperar (leer un archivo, una demora) <em>sin congelar</em> la pantalla. Se lanza con <code>launch</code>.</td></tr>
+  <tr><td><strong>suspend</strong></td><td>Marca una función que puede “pausarse” mientras espera. Solo se llama desde una corrutina u otra función suspend.</td></tr>
+  <tr><td><strong>Flow / StateFlow</strong></td><td>Un “canal” de valores que cambian con el tiempo. Quien lo observa recibe cada valor nuevo. <code>StateFlow</code> siempre tiene un valor actual.</td></tr>
+  <tr><td><strong>Fábrica (Factory)</strong></td><td>Objeto que le explica a Android cómo construir un ViewModel que necesita parámetros.</td></tr>
+  <tr><td><strong>filesDir</strong></td><td>Carpeta privada de la app en el teléfono. Ahí se guardan archivos sin pedir permisos.</td></tr>
+  <tr><td><strong>Room</strong></td><td>Biblioteca de Android para usar una base de datos SQLite con tablas, consultas y Kotlin.</td></tr>
+</table>
+
+<h2 class="salto">Organización del proyecto en carpetas</h2>
 <p>El código está organizado por <strong>capas</strong>, con la misma estructura que el repositorio de referencia
 <em>PokedexAcademy-MVVM-Clean</em>. Cada carpeta es un <em>paquete</em> de Kotlin (<code>com.example.mvvmlab.presentation.nota</code>, etc.).
 En cada rama aparecen solo las carpetas que ese ejercicio usa.</p>
@@ -88,11 +119,15 @@ app/src/test/java/com/example/mvvmlab/
   ejercicios cada use case solo llamaría a un método del Repository. La teoría (diapositiva 4) aclara que la capa de dominio es opcional.
 </div>
 
-<h2>Ejercicio 1 — ¿Quién está haciendo demasiado?</h2>
+<h2 class="salto">Ejercicio 1 — ¿Quién está haciendo demasiado?</h2>
 
 <p><strong>Consigna:</strong> tomar una pantalla donde todo está mezclado, marcar dónde se dibuja la interfaz, dónde se validan
 los datos, dónde se modifica la lista y dónde se guarda, y ubicar cada responsabilidad en
 <em>View</em>, <em>ViewModel</em> o <em>Model/Repository</em>. Todavía <strong>no</strong> se cambia la implementación.</p>
+<div class="caja pocas"><strong class="titulo">En pocas palabras</strong>Se analiza una pantalla que hace <strong>todo junta</strong> (dibujar, validar, guardar) y se decide a qué parte de MVVM pertenece cada línea.
+No se escribe código nuevo: es un ejercicio de <em>mirar y clasificar</em>. Es la base de todo lo que sigue.</div>
+<div class="caja novato"><strong class="titulo">Aclaraciones para novatos</strong><ul><li><strong>“Declarar una variable” no dice nada de la capa.</strong> Hay variables en la View, en el ViewModel y en el Repository. La pregunta útil es: <em>¿este dato tiene que sobrevivir si cierro la app?</em></li><li><strong>El ViewModel decide QUÉ mostrar; la View decide CÓMO.</strong> “Hay un error” es del ViewModel; “el error va en rojo” es de la View.</li><li><strong>Una regla de negocio</strong> es algo que valdría igual si la app fuera web (“no se aceptan tareas vacías”). Esas van fuera de la pantalla.</li><li><strong>Evento ≠ estado.</strong> El click en “Agregar” es un evento (pasó); la lista de tareas es estado (está). Los eventos suben, el estado baja.</li><li><strong>Ver un <code>Context</code> dentro de una pantalla es una pista</strong> de que algo (por ejemplo, guardar archivos) está en el lugar equivocado.</li></ul></div>
+
 
 <h3>Conceptos base</h3>
 
