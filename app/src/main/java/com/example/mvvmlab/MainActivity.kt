@@ -13,9 +13,7 @@ import com.example.mvvmlab.ui.theme.MvvmLabTheme
 
 class MainActivity : ComponentActivity() {
 
-    // by viewModels { Factory }: igual que antes, pero indicando la fabrica
-    // que sabe construir el ViewModel con su repositorio.
-    private val borradorViewModel: BorradorViewModel by viewModels { BorradorViewModel.Factory }
+    private val notasViewModel: NotasViewModel by viewModels { NotasViewModel.Factory }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,8 +21,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MvvmLabTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    PantallaBorradorConViewModel(
-                        viewModel = borradorViewModel,
+                    PantallaNotasConViewModel(
+                        viewModel = notasViewModel,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

@@ -1364,5 +1364,152 @@ El estado tiene que describir la verdad: <code>Guardando</code> mientras se escr
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 10 — De un texto a una lista persistente</h2>
+<p><strong>Consigna:</strong> extender el ejercicio a varias notas. Elegir un formato de texto claro y documentado para persistirlas (JSON textual o registros
+con escape bien definido; no <code>split(";")</code> si el usuario puede escribir punto y coma). Implementar lectura, alta, edición y borrado a través del
+Repository. <strong>Desafío:</strong> escribir primero en un temporal y sustituir el destino sólo cuando la nueva versión esté completa.
+<br>Rama: <code>ej10-lista-persistente</code> · Archivos: <code>NotaRepository.kt</code> (contrato + <code>ArchivoNotasRepository</code>), <code>NotasViewModel.kt</code>,
+<code>PantallaNotas.kt</code>, <code>ValidadorNota.kt</code> (vuelve del Ej 5)</p>
+
+<h3>Paso 0 · ¿Por qué no <code>split(";")</code>?</h3>
+<p>Si cada nota se guardara como <code>titulo;contenido</code> en una línea, una nota con contenido <code>"Linea 2; con punto y coma"</code> se partiría en dos campos,
+y un salto de línea partiría la nota en dos registros. Hace falta un formato que defina cómo <strong>escapar</strong> los caracteres especiales.</p>
+
+<div class="bloque">
+<h3>Paso 1 · Formato documentado: <code>notas.json</code></h3>
+<pre>{
+  "version": 1,
+  "notas": [
+    { "id": "24d7e63e-...", "titulo": "Parcial DA1", "contenido": "Linea 1\nLinea 2; con punto y coma" },
+    { "id": "507e3e76-...", "titulo": "Cita",        "contenido": "Dijo: \"usa JSON\" y ya" }
+  ]
+}</pre>
+</div>
+<table>
+  <tr><th style="width:30%">Decisión</th><th>Por qué</th></tr>
+  <tr><td>JSON (con <code>org.json</code>)</td><td>Define el escape: <code>\n</code> para salto de línea, <code>\"</code> para comillas, <code>\\</code> para la barra. El <code>;</code> no es especial.
+  <code>org.json</code> viene incluido en Android: <strong>sin dependencias nuevas</strong>.</td></tr>
+  <tr><td>Campo vacío = <code>""</code></td><td>Una nota vacía se representa con cadenas vacías, nunca omitiendo el campo ni con <code>null</code> (igual, el validador no deja guardarlas).</td></tr>
+  <tr><td><code>"version": 1</code></td><td>Si mañana cambia el formato, el lector sabe qué versión está leyendo.</td></tr>
+  <tr><td>Archivo inexistente = lista vacía</td><td>Es la primera vez que se usa la app: no es un error.</td></tr>
+  <tr><td>Contenido corrupto = <strong>error</strong>, no lista vacía</td><td>Ver Paso 3.</td></tr>
+</table>
+
+<div class="bloque">
+<h3>Paso 2 · El Repository: leer todo → modificar → escribir todo</h3>
+<pre>class ArchivoNotasRepository(carpeta: File) : NotaRepository {
+    private val mutex = Mutex()
+
+    override suspend fun obtenerTodas() = mutex.withLock { leerArchivo() }
+
+    override suspend fun guardar(nota: Nota) = mutex.withLock {      // alta o edición
+        val notas = leerArchivo().toMutableList()
+        val i = notas.indexOfFirst { it.id == nota.id }
+        if (i &gt;= 0) notas[i] = nota else notas.add(nota)
+        escribirArchivo(notas)
+    }
+
+    override suspend fun eliminar(id: String) = mutex.withLock {
+        escribirArchivo(leerArchivo().filterNot { it.id == id })
+    }
+}</pre>
+</div>
+<ul>
+  <li><strong>El contrato es el mismo del Ej 6</strong> (<code>obtenerTodas</code>, <code>guardar</code>, <code>eliminar</code>): cambió la implementación, de memoria a archivo.</li>
+  <li><strong><code>guardar</code> sirve para alta y edición</strong>: si el id ya existe, reemplaza; si no, agrega.</li>
+  <li><strong><code>Mutex</code></strong>: cada operación es “leer, modificar, escribir”. Si dos se mezclaran (borrar mientras se guarda), una pisaría a la otra.
+  <code>mutex.withLock { }</code> hace que se ejecuten de a una.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · Lector robusto: contenido incompleto</h3>
+<pre>try {
+    val raiz = JSONObject(texto)
+    ...
+} catch (e: JSONException) {
+    throw FormatoInvalidoException("El archivo notas.json tiene un formato inválido", e)
+}
+class FormatoInvalidoException(...) : IOException(...)</pre>
+</div>
+<div class="caja ojo">
+  <strong class="titulo">¿Por qué no devolver una lista vacía si el archivo está dañado?</strong>
+  Porque el próximo <code>guardar</code> haría “leer (vacío) → agregar una → escribir” y <strong>borraría todas las notas</strong> que quedaban en el archivo.
+  Al lanzar una excepción, el ViewModel muestra el error con <em>Reintentar</em> y el formulario queda deshabilitado: el archivo no se toca.
+  <code>FormatoInvalidoException</code> extiende <code>IOException</code>, así que el ViewModel la maneja igual que cualquier falla de lectura (Ej 9).
+</div>
+
+<div class="bloque">
+<h3>Paso 4 · Desafío: escritura segura con temporal</h3>
+<pre>private suspend fun escribirArchivo(notas: List&lt;Nota&gt;) = withContext(Dispatchers.IO) {
+    val raiz = JSONObject().put("version", 1).put("notas", array)
+    temporal.writeText(raiz.toString(2), Charsets.UTF_8)     // 1. versión nueva COMPLETA en notas.json.tmp
+    if (!temporal.renameTo(archivo))                          // 2. reemplazo atómico
+        throw IOException("No se pudo reemplazar notas.json")
+}</pre>
+</div>
+<p>Si la app se corta a mitad de la escritura (batería, Android mata el proceso), solo queda un <code>.tmp</code> a medias y <code>notas.json</code> sigue intacto.
+Renombrar dentro de la misma carpeta es <strong>atómico</strong>: el archivo final es la versión vieja completa o la nueva completa, nunca una mezcla.</p>
+
+<div class="bloque">
+<h3>Paso 5 · ViewModel: un formulario para alta y edición</h3>
+<pre>data class NotasUiState(
+    val carga: EstadoCarga = EstadoCarga.Cargando,
+    val notas: List&lt;Nota&gt; = emptyList(),
+    val editandoId: String? = null,     // null = nota nueva; si no, la que se edita
+    val titulo: String = "", val contenido: String = "",
+    val errorTitulo: String? = null, val errorContenido: String? = null,
+    val procesando: Boolean = false, val errorOperacion: String? = null
+)
+
+fun onEditar(nota: Nota)  // copia la nota al formulario (editandoId = nota.id)
+fun onGuardar()           // valida; id = editandoId ?: UUID nuevo; repositorio.guardar(nota)
+fun onEliminar(id: String)
+
+private fun ejecutar(mensajeError: String, operacion: suspend () -&gt; Unit) {
+    // procesando = true → operacion() → recargar desde el Repository → procesando = false
+    // si falla: errorOperacion = mensajeError
+}</pre>
+</div>
+<p><code>ejecutar</code> recibe una <strong>función suspend como parámetro</strong> (<code>suspend () -&gt; Unit</code>): evita repetir el mismo try/catch en guardar y eliminar.
+Después de cada operación se vuelve a leer del Repository: la lista mostrada es siempre la del archivo (<strong>fuente de verdad</strong>).</p>
+
+<div class="figs">
+  <figure><img src="img/ej10_editando.png" style="height:250px"><br>Editando una nota<br>(fila resaltada, “Guardar cambios”)</figure>
+  <figure><img src="img/ej10_corrupto.png" style="height:250px"><br>notas.json truncado:<br>error + Reintentar, archivo intacto</figure>
+</div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th style="width:44%">Prueba</th><th>Resultado</th></tr>
+  <tr><td>Alta de 3 notas: con salto de línea y <code>;</code>, con comillas, con comas</td><td>“Notas guardadas (3)”; en el JSON: <code>\n</code> y <code>\"</code> escapados ✅</td></tr>
+  <tr><td>Eliminar “Cita”</td><td>Quedan 2 ✅</td></tr>
+  <tr><td>Editar “Compras” → agregar “y mate” → Guardar cambios</td><td>Se reemplaza la misma nota (mismo id) ✅</td></tr>
+  <tr><td><code>am force-stop</code> y reabrir</td><td>Las 2 notas con saltos de línea y puntuación intactos ✅</td></tr>
+  <tr><td><code>notas.json</code> truncado a 60 bytes</td><td>“El archivo notas.json tiene un formato inválido” + Reintentar; el archivo no se sobrescribe ✅</td></tr>
+  <tr><td><code>ValidadorNotaTest</code></td><td>5/5 ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Cómo se representa una nota vacía?</strong><br>
+Con cadenas vacías: <code>{"id": "...", "titulo": "", "contenido": ""}</code>. Los campos siempre están presentes (nunca omitidos ni <code>null</code>), así el lector
+no tiene casos especiales. En la práctica el validador impide guardarlas.</p>
+<p><strong>2. ¿Qué hace el lector si el contenido está incompleto?</strong><br>
+<code>JSONObject</code> lanza <code>JSONException</code>; el Repository la convierte en <code>FormatoInvalidoException</code> (una <code>IOException</code>). El ViewModel muestra
+el error con Reintentar y bloquea el formulario. No devuelve lista vacía para no pisar el archivo en el próximo guardado.</p>
+<p><strong>3. ¿Qué se perdería si se reescribe mal el archivo?</strong><br>
+<strong>Todas</strong> las notas: el archivo se reescribe entero en cada operación. Un corte a mitad de escritura dejaría un JSON truncado e ilegible. Por eso
+el desafío: escribir en <code>.tmp</code> y renombrar recién cuando está completo.</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li>Formato JSON documentado: escapa <code>;</code>, comillas y saltos de línea; versión; campos siempre presentes.</li>
+    <li>Mismo contrato <code>NotaRepository</code>, nueva implementación con archivo; <code>Mutex</code> para leer-modificar-escribir.</li>
+    <li>Archivo corrupto → error, nunca lista vacía.</li>
+    <li>Escritura segura: temporal + renombrado atómico.</li>
+    <li>Un formulario para alta y edición (<code>editandoId</code>).</li>
+  </ol>
+</div>
+
 </body>
 </html>

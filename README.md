@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 9: Cargando, listo o falló
+# MvvmLab — Ejercicio 10: De un texto a una lista persistente
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -20,41 +20,61 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej06-repository` | 6 — Repository: cambiar datos sin cambiar la pantalla |
 | `ej07-leer-archivo` | 7 — Leer un archivo de texto desde el Repository |
 | `ej08-guardar-archivo` | 8 — Guardar texto, cerrar y volver |
-| **`ej09-carga-error`** | **9 — Cargando, listo o falló** ← esta rama |
+| `ej09-carga-error` | 9 — Cargando, listo o falló |
+| **`ej10-lista-persistente`** | **10 — De un texto a una lista persistente** ← esta rama |
 
 ---
 
 ## Consigna
 
-Modelar un estado de carga y uno de error para lectura/escritura. `viewModelScope` para iniciar el trabajo y disco en IO.
-Evitar que una excepción cierre la app. Probar la ruta de error con un Repository de prueba que lance una excepción
-controlada (sin tocar permisos). **Desafío:** Reintentar si la carga falla.
+Extender a varias notas. Elegir un formato de texto claro y documentado (no `split(";")` si el usuario puede escribir
+punto y coma). Lectura, alta, edición y borrado a través del Repository.
+**Desafío:** escribir primero en un temporal y sustituir el destino sólo cuando la nueva versión esté completa.
 
 ## Archivos
 
-| Archivo | Cambio |
-|---|---|
-| `BorradorViewModel.kt` | `sealed interface EstadoCarga` (Cargando/Listo/Error) y `EstadoGuardado` (Inactivo/Guardando/Guardado/Error); `try/catch (IOException)`; `onReintentar`; constante `USAR_REPOSITORIO_QUE_FALLA` en la fábrica |
-| `RepositorioQueFalla.kt` | **Nuevo**: implementación del contrato que falla a propósito (1ª lectura y toda escritura) con demora |
-| `PantallaBorrador.kt` | `when` exhaustivo: indicador de carga, tarjeta de error con Reintentar, mensaje de guardado |
-| `BorradorRepository.kt` | Sin cambios (ya despacha en `Dispatchers.IO`) |
+| Archivo | Capa | Contenido |
+|---|---|---|
+| `NotaRepository.kt` | Datos | `Nota`, contrato `NotaRepository` (el del Ej 6), `FormatoInvalidoException`, `ArchivoNotasRepository` (JSON + `Mutex` + temporal) |
+| `NotasViewModel.kt` | ViewModel | `NotasUiState` (carga, notas, formulario con `editandoId`), alta/edición/borrado, `Factory` |
+| `PantallaNotas.kt` | View | Formulario (nueva / editando) + lista con Editar / Eliminar + estados de carga y error |
+| `ValidadorNota.kt` (+ test) | Reglas | Vuelve del Ej 5 |
+
+## Formato documentado: `notas.json`
+
+```json
+{
+  "version": 1,
+  "notas": [
+    { "id": "24d7e63e-...", "titulo": "Parcial DA1", "contenido": "Linea 1\nLinea 2; con punto y coma" },
+    { "id": "507e3e76-...", "titulo": "Cita", "contenido": "Dijo: \"usa JSON\" y ya" }
+  ]
+}
+```
+
+- JSON escapa `\n`, `\"` y `\\`; el `;` no es especial. `org.json` viene con Android (sin dependencias).
+- Nota vacía: campos `""`, siempre presentes (nunca omitidos ni `null`).
+- Archivo inexistente = lista vacía. Contenido corrupto = `FormatoInvalidoException` (no lista vacía, para no pisar el archivo).
+- **Escritura segura:** se escribe `notas.json.tmp` completo y después `renameTo(notas.json)` (atómico).
 
 ## Pruebas (emulador)
 
 | Prueba | Resultado |
 |---|---|
-| `RepositorioQueFalla`: abrir | "Cargando borrador..." → "No se pudo leer el borrador." + Reintentar, sin cierre ✅ |
-| Reintentar | Carga el texto ✅ |
-| Editar → Guardar (falla) | "No se pudo guardar. Tus cambios siguen en pantalla." ✅ |
-| Repositorio real | Carga y "✓ Guardado" ✅ |
+| 3 notas con salto de línea + `;`, comillas, comas | Guardadas; JSON con `\n` y `\"` ✅ |
+| Eliminar / Editar | Correcto, la edición conserva el id ✅ |
+| `force-stop` y reabrir | Notas intactas ✅ |
+| `notas.json` truncado | Error "formato inválido" + Reintentar; archivo no sobrescrito ✅ |
+| `ValidadorNotaTest` | 5/5 ✅ |
 
 ## Preguntas de la guía
 
-**¿Qué excepción no conviene capturar silenciosamente?** `CancellationException`: es cómo se cancelan las corrutinas.
-Un `catch (e: Exception)` genérico la atraparía. Por eso se captura solo `IOException`.
+**¿Cómo se representa una nota vacía?** Con `""` en cada campo, siempre presentes.
 
-**¿Por qué "Guardado" sólo después de completar la escritura?** Si se mostrara antes y la escritura fallara, el usuario
-creería que sus datos están a salvo y los perdería.
+**¿Qué hace el lector si el contenido está incompleto?** Lanza `FormatoInvalidoException`; el ViewModel muestra error con
+Reintentar y bloquea el formulario. No devuelve lista vacía.
+
+**¿Qué se perdería si se reescribe mal el archivo?** Todas las notas (se reescribe entero). Por eso temporal + renombrado.
 
 ## Criterio de finalización
-- ✅ Se ven estados de carga, éxito y error; ninguna operación de archivo se realiza directamente en la UI.
+- ✅ Tres notas con saltos de línea o signos de puntuación sobreviven al reinicio y pueden editarse y eliminarse.
