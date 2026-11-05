@@ -17,8 +17,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MvvmLabTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    // Ejercicio actual: 2 (pantalla de notas con un unico estado).
-                    // El Ejercicio 1 sigue disponible en Ej01PantallaTareas.kt.
+                    // Ejercicio 2: pantalla de notas con un unico estado.
                     PantallaNotaConEstado(modifier = Modifier.padding(innerPadding))
                 }
             }

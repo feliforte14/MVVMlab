@@ -1,42 +1,21 @@
-# MvvmLab
+# MvvmLab — Ejercicio 2: Una pantalla no es su estado
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3. Una app de notas que va creciendo ejercicio a ejercicio,
 separando responsabilidades con **MVVM** y un **Repository** que termina leyendo y escribiendo archivos.
 
-📄 Apuntes completos (teoría + resolución de cada ejercicio): [`apuntes/Apuntes_MVVM.pdf`](apuntes/Apuntes_MVVM.pdf)
+📄 Apuntes (teoría + resolución de los ejercicios hasta este): [`apuntes/Apuntes_MVVM.pdf`](apuntes/Apuntes_MVVM.pdf)
 
 ## Ramas
 
-Cada ejercicio vive en su propia rama, creada a partir de la anterior.
+Cada rama contiene **solo el código de su ejercicio**.
 
-| Rama | Ejercicio | Estado |
-|---|---|---|
-| `main` | Proyecto base (Empty Activity Compose) | — |
-| `ej01-responsabilidades` | 1 — ¿Quién está haciendo demasiado? | ✅ |
-| `ej02-estado-pantalla` | 2 — Una pantalla no es su estado | ✅ |
-
----
-
-## Ejercicio 1 — ¿Quién está haciendo demasiado?
-
-**Archivo:** `Ej01PantallaTareas.kt` — pantalla de tareas con todo mezclado, *a propósito*, para analizarla.
-
-| Letra | Código | Dónde va |
-|---|---|---|
-| (A) | `var texto` (borrador) | ViewModel |
-| (B) | `var tareas` (dato real) | Repository |
-| (C) | `var error` | ViewModel |
-| (D) | `Column`, `Text`, `OutlinedTextField` | View |
-| (E) | `texto.isBlank()` (regla) | ViewModel |
-| (F) | `tareas.contains(texto)` (regla) | ViewModel |
-| (G) | `tareas = tareas + texto` | Repository |
-| (H) | `File(...).writeText(...)` | Repository |
-| (I) | `texto = ""` | ViewModel |
-| (J) | `error?.let { Text(it, Color.Red) }` | View |
-| (K) | `LazyColumn` | View |
-
-**UDF:** los **eventos suben** (View → ViewModel → Repository) y el **estado baja** (ViewModel → View).
+| Rama | Ejercicio |
+|---|---|
+| `main` | Proyecto base (Empty Activity Compose) |
+| `ej01-responsabilidades` | 1 — ¿Quién está haciendo demasiado? |
+| **`ej02-estado-pantalla`** | **2 — Una pantalla no es su estado** ← esta rama |
+| `ej03-viewmodel` | 3 — Primer ViewModel, sin magia |
 
 ---
 
