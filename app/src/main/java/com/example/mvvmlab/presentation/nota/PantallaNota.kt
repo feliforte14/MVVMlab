@@ -1,9 +1,11 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.nota
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -13,7 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import androidx.lifecycle.ViewModel
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.domain.model.Nota
 
 // =====================================================================
 // VIEW (sin estado propio)
@@ -83,7 +87,6 @@ fun PantallaNota(
     }
 }
 
-
 // --- PREVIEWS ---------------------------------------------------------
 // Como PantallaNota no tiene estado propio, se puede previsualizar en
 // cualquier situacion pasandole un NotaUiState armado a mano.
@@ -116,6 +119,28 @@ fun PantallaNotaGuardadaPreview() {
                 guardada = Nota("Parcial", "Repasar MVVM")
             ),
             {}, {}, {}
+        )
+    }
+}
+
+// --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
+// Conecta el ViewModel con la View. Reutiliza PantallaNota (la del Ej 2)
+// SIN CAMBIOS: como era una View sin estado, no le importa quien es
+// el dueño del estado (antes un composable, ahora un ViewModel).
+@Composable
+fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
+    // verticalScroll: en horizontal (rotado) la pantalla no entra entera.
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        PantallaNota(
+            estado = viewModel.estado,                     // el estado BAJA
+            onTituloChange = viewModel::onTituloChange,    // los eventos SUBEN
+            onContenidoChange = viewModel::onContenidoChange,
+            onGuardar = viewModel::onGuardar
+        )
+        Text(
+            "Intentos de guardado: ${viewModel.intentosGuardado}",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
     }
 }

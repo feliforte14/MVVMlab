@@ -7,7 +7,7 @@ Kotlin + Jetpack Compose + Material 3.
 
 ## Ramas
 
-Cada rama contiene **solo el código de su ejercicio**.
+Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una rama a la siguiente).
 
 | Rama | Ejercicio |
 |---|---|
@@ -17,6 +17,31 @@ Cada rama contiene **solo el código de su ejercicio**.
 | **`ej03-viewmodel`** | **3 — Primer ViewModel, sin magia** ← esta rama |
 
 ---
+
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ ├── presentation/
+ │   ├── nota/
+ │   │   ├── NotaUiState.kt
+ │   │   ├── NotaViewModel.kt
+ │   │   ├── PantallaNota.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── ExampleUnitTest.kt
+```
 
 ## Consigna
 
@@ -29,9 +54,9 @@ y comprobar qué sucede al rotar el emulador.
 
 | Archivo | Capa | Contenido |
 |---|---|---|
-| `NotaUiState.kt` | Modelo / estado | `Nota` (nota guardada) y `NotaUiState` (estado de pantalla) |
-| `PantallaNota.kt` | View | Composable **sin estado**: dibuja `NotaUiState` y avisa eventos por callbacks. 3 previews |
-| `NotaViewModel.kt` | ViewModel | Dueño del estado y de las reglas; `PantallaNotaConViewModel` conecta VM ↔ View |
+| `presentation/nota/NotaUiState.kt` | Modelo / estado | `Nota` (nota guardada) y `NotaUiState` (estado de pantalla) |
+| `presentation/nota/PantallaNota.kt` | View | Composable **sin estado**: dibuja `NotaUiState` y avisa eventos por callbacks. 3 previews |
+| `presentation/nota/NotaViewModel.kt` | ViewModel | Dueño del estado y de las reglas; `PantallaNotaConViewModel` conecta VM ↔ View |
 | `MainActivity.kt` | — | Obtiene el ViewModel con `by viewModels()` y lo pasa a la pantalla. No valida nada |
 
 ## Puntos clave
