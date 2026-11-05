@@ -20,6 +20,35 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 
 ---
 
+## Estructura de carpetas
+
+Organizado por capas como *PokedexAcademy-MVVM-Clean*: `domain/` (Kotlin puro: modelos, contratos, reglas), `data/` (implementaciones), `presentation/` (ViewModels y pantallas), `di/`, `core/`.
+
+```
+app/src/main/java/com/example/mvvmlab/
+ ├── MainActivity.kt
+ ├── core/
+ │   ├── theme/
+ │   │   ├── Color.kt
+ │   │   ├── Theme.kt
+ │   │   ├── Type.kt
+ ├── domain/
+ │   ├── model/
+ │   │   ├── Nota.kt
+ │   ├── validacion/
+ │   │   ├── ValidadorNota.kt
+ ├── presentation/
+ │   ├── nota/
+ │   │   ├── NotaUiState.kt
+ │   │   ├── NotaViewModel.kt
+ │   │   ├── PantallaNota.kt
+
+app/src/test/java/com/example/mvvmlab/
+ ├── domain/
+ │   ├── validacion/
+ │   │   ├── ValidadorNotaTest.kt
+```
+
 ## Consigna
 
 Agregar reglas: título no vacío, contenido de al menos diez caracteres y prohibición de guardar dos veces mientras se
@@ -30,10 +59,10 @@ procesa una solicitud. Ubicar las reglas fuera de la vista. Mostrar errores cerc
 
 | Archivo | Capa | Cambio |
 |---|---|---|
-| `ValidadorNota.kt` | Reglas (Kotlin puro) | **Nuevo**: `ValidadorNota.validar(titulo, contenido): ErroresNota` |
-| `NotaViewModel.kt` | ViewModel | `onGuardar` aplica las reglas; `if (guardando) return` evita el doble guardado |
-| `NotaUiState.kt` | Estado | `error` → `errorTitulo` + `errorContenido` (un error por campo) |
-| `PantallaNota.kt` | View | Cada campo muestra su error con `isError` + `supportingText` |
+| `domain/validacion/ValidadorNota.kt` | Reglas (Kotlin puro) | **Nuevo**: `ValidadorNota.validar(titulo, contenido): ErroresNota` |
+| `presentation/nota/NotaViewModel.kt` | ViewModel | `onGuardar` aplica las reglas; `if (guardando) return` evita el doble guardado |
+| `presentation/nota/NotaUiState.kt` | Estado | `error` → `errorTitulo` + `errorContenido` (un error por campo) |
+| `presentation/nota/PantallaNota.kt` | View | Cada campo muestra su error con `isError` + `supportingText` |
 | `app/src/test/.../ValidadorNotaTest.kt` | Test | **Nuevo**: 5 tests JUnit (sin emulador) |
 
 ## Reglas

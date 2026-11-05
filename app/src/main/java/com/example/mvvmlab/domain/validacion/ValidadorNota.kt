@@ -1,4 +1,4 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.domain.validacion
 
 // =====================================================================
 // EJERCICIO 5 — Validar sin esconder la regla en un boton

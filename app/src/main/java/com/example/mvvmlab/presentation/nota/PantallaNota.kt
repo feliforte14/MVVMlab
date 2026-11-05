@@ -1,19 +1,25 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.nota
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.mvvmlab.ui.theme.MvvmLabTheme
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mvvmlab.core.theme.MvvmLabTheme
+import com.example.mvvmlab.domain.model.Nota
 
 // =====================================================================
 // VIEW (sin estado propio)
@@ -87,7 +93,6 @@ fun PantallaNota(
     }
 }
 
-
 // --- PREVIEWS ---------------------------------------------------------
 // Como PantallaNota no tiene estado propio, se puede previsualizar en
 // cualquier situacion pasandole un NotaUiState armado a mano.
@@ -126,4 +131,17 @@ fun PantallaNotaGuardadaPreview() {
             {}, {}, {}
         )
     }
+}
+
+// --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
+@Composable
+fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
+    val estado by viewModel.uiState.collectAsStateWithLifecycle()
+    PantallaNota(
+        estado = estado,
+        onTituloChange = viewModel::onTituloChange,
+        onContenidoChange = viewModel::onContenidoChange,
+        onGuardar = viewModel::onGuardar,
+        modifier = modifier.verticalScroll(rememberScrollState())
+    )
 }

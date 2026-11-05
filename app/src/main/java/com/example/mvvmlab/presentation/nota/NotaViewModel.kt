@@ -1,14 +1,10 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.nota
 
 import android.util.Log
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.example.mvvmlab.domain.model.Nota
+import com.example.mvvmlab.domain.validacion.ValidadorNota
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,18 +66,4 @@ class NotaViewModel : ViewModel() {
     companion object {
         private const val TAG = "NotaViewModel"
     }
-}
-
-
-// --- PANTALLA CONECTADA AL VIEWMODEL ----------------------------------
-@Composable
-fun PantallaNotaConViewModel(viewModel: NotaViewModel, modifier: Modifier = Modifier) {
-    val estado by viewModel.uiState.collectAsStateWithLifecycle()
-    PantallaNota(
-        estado = estado,
-        onTituloChange = viewModel::onTituloChange,
-        onContenidoChange = viewModel::onContenidoChange,
-        onGuardar = viewModel::onGuardar,
-        modifier = modifier.verticalScroll(rememberScrollState())
-    )
 }

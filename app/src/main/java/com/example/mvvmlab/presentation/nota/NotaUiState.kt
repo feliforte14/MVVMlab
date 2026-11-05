@@ -1,14 +1,6 @@
-package com.example.mvvmlab
+package com.example.mvvmlab.presentation.nota
 
-// =====================================================================
-// MODELO Y ESTADO DE PANTALLA
-// =====================================================================
-
-// Una nota YA GUARDADA. No es lo mismo que lo que se esta escribiendo.
-data class Nota(
-    val titulo: String,
-    val contenido: String
-)
+import com.example.mvvmlab.domain.model.Nota
 
 // "Foto" de todo lo que la pantalla necesita para dibujarse.
 data class NotaUiState(
