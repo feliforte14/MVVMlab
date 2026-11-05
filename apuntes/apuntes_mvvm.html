@@ -873,5 +873,148 @@ molesta; no limpiarlo nunca deja un mensaje desactualizado mientras el usuario y
   </ol>
 </div>
 
+<h2 class="salto">Ejercicio 6 — Repository: cambiar datos sin cambiar la pantalla</h2>
+<p><strong>Consigna:</strong> definir un contrato <code>NotaRepository</code> con operaciones para obtener, guardar y eliminar notas. Implementar primero
+una versión en memoria. El ViewModel sólo habla con el contrato. Decidir si el resultado se devuelve como valor puntual o como <code>Flow</code> y justificarlo.
+<strong>Desafío:</strong> reemplazar la implementación por otra lista precargada sin modificar el composable.
+<br>Rama: <code>ej06-repository</code> · Archivo nuevo: <code>NotaRepository.kt</code></p>
+
+<h3>Paso 0 · ¿Para qué un Repository?</h3>
+<p>Hasta el Ej 5 el ViewModel “simulaba” guardar. Pero el ViewModel no debería saber <em>dónde</em> se guardan los datos (memoria, archivo, base de datos,
+internet): su trabajo es coordinar la pantalla. El <strong>Repository</strong> es la pieza de la capa de datos que esconde ese “dónde” detrás de un contrato.
+Es la <strong>(G)</strong> y la <strong>(H)</strong> de la tabla del Ej 1.</p>
+
+<div class="caja clave">
+  <strong class="titulo">Contrato = <code>interface</code></strong>
+  Una <code>interface</code> dice <strong>qué</strong> operaciones existen, sin decir <strong>cómo</strong> se hacen. Varias clases pueden <em>implementarla</em>
+  (<code>: NotaRepository</code>), cada una a su manera. Quien usa la interfaz no sabe ni le importa cuál le tocó.
+</div>
+
+<div class="bloque">
+<h3>Paso 1 · El contrato</h3>
+<pre>interface NotaRepository {
+    suspend fun obtenerTodas(): List&lt;Nota&gt;
+    suspend fun guardar(nota: Nota)      // si ya existe ese id, la reemplaza
+    suspend fun eliminar(id: String)
+}</pre>
+</div>
+<ul>
+  <li><strong><code>suspend</code></strong>: la operación puede tardar (disco, red) y se ejecuta dentro de una corrutina sin bloquear la pantalla.
+  Solo se puede llamar desde otra función <code>suspend</code> o desde <code>launch</code>.</li>
+  <li><strong><code>Nota</code> ahora tiene <code>id</code></strong>: con varias notas, el Repository necesita saber cuál eliminar o reemplazar.
+  El ViewModel lo genera con <code>UUID.randomUUID().toString()</code> (un identificador único al azar).</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 2 · Dos implementaciones del mismo contrato</h3>
+<pre>class NotaRepositoryEnMemoria : NotaRepository {           // empieza vacía
+    private val notas = mutableListOf&lt;Nota&gt;()
+    override suspend fun obtenerTodas(): List&lt;Nota&gt; { delay(300); return notas.toList() }
+    override suspend fun guardar(nota: Nota) {
+        delay(300)
+        val i = notas.indexOfFirst { it.id == nota.id }
+        if (i &gt;= 0) notas[i] = nota else notas.add(nota)
+    }
+    override suspend fun eliminar(id: String) { delay(300); notas.removeAll { it.id == id } }
+}
+
+class NotaRepositoryDeEjemplo : NotaRepository {           // desafío: precargada
+    private val notas = mutableListOf(
+        Nota("ej-1", "Parcial DA1", "Repasar MVVM, StateFlow y Repository"), ...)
+    ...
+}</pre>
+</div>
+<ul>
+  <li><strong><code>override</code></strong>: “esta función cumple la que pide la interfaz”.</li>
+  <li><strong><code>notas.toList()</code></strong> devuelve una <em>copia</em>: quien la recibe no puede modificar la lista interna del Repository.</li>
+  <li><code>delay(300)</code> simula una fuente que tarda, para ver que la pantalla sigue respondiendo.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 3 · El ViewModel recibe el contrato</h3>
+<pre>class NotaViewModel(
+    private val repositorio: NotaRepository = NotaRepositoryEnMemoria()   // ← único lugar donde se elige
+) : ViewModel() {
+
+    init { viewModelScope.launch { recargarNotas() } }
+
+    private suspend fun recargarNotas() {
+        val notas = repositorio.obtenerTodas()
+        _uiState.update { it.copy(notas = notas) }
+    }
+
+    fun onGuardar() {
+        ... // validación igual que en el Ej 5
+        viewModelScope.launch {
+            repositorio.guardar(Nota(UUID.randomUUID().toString(), titulo, contenido))
+            recargarNotas()
+            _uiState.update { it.copy(guardando = false, titulo = "", contenido = "") }
+        }
+    }
+
+    fun onEliminar(id: String) {
+        viewModelScope.launch { repositorio.eliminar(id); recargarNotas() }
+    }
+}</pre>
+</div>
+<ul>
+  <li>El tipo del parámetro es <code>NotaRepository</code> (la interfaz), <strong>no</strong> <code>NotaRepositoryEnMemoria</code>: el ViewModel solo habla con el contrato.</li>
+  <li>El valor por defecto <code>= NotaRepositoryEnMemoria()</code> es provisorio. Como todos los parámetros tienen valor por defecto, Kotlin genera un
+  constructor vacío y <code>by viewModels()</code> lo puede crear. En el <strong>Ej 11</strong> esto se reemplaza por una fábrica explícita.</li>
+</ul>
+
+<div class="bloque">
+<h3>Paso 4 · La pantalla: lista con <code>LazyColumn</code></h3>
+<pre>LazyColumn(...) {
+    item { /* formulario: título, contenido, Guardar, "Notas guardadas (n)" */ }
+    items(estado.notas, key = { it.id }) { nota -&gt;
+        FilaNota(nota = nota, onEliminar = { onEliminar(nota.id) })
+    }
+}</pre>
+</div>
+<ul>
+  <li><code>LazyColumn</code> solo dibuja las filas visibles (como un <code>RecyclerView</code>). <code>item { }</code> agrega un elemento suelto (el formulario);
+  <code>items(lista) { }</code>, uno por cada nota.</li>
+  <li><code>key = { it.id }</code>: Compose identifica cada fila por su id, no por su posición; al borrar una no se “corren” las demás.</li>
+  <li><code>FilaNota</code> es un composable reutilizable para una fila. La pantalla recibe <code>List&lt;Nota&gt;</code> ya lista: <strong>no conoce al Repository</strong>.</li>
+</ul>
+
+<h3>Decisión: valor puntual (<code>suspend</code>) y no <code>Flow</code></h3>
+<table>
+  <tr><th style="width:22%"></th><th>Valor puntual (<code>suspend fun obtenerTodas(): List</code>)</th><th>Flow (<code>fun observar(): Flow&lt;List&gt;</code>)</th></tr>
+  <tr><td>Qué devuelve</td><td>Una “foto” de los datos en ese momento</td><td>Un flujo que emite cada vez que los datos cambian</td></tr>
+  <tr><td>Después de escribir</td><td>El ViewModel vuelve a pedir la foto (<code>recargarNotas()</code>)</td><td>Se actualiza solo</td></tr>
+  <tr><td>Conviene cuando</td><td>Una sola pantalla lee y escribe</td><td>Varias pantallas miran los mismos datos, o la fuente ya emite (Room)</td></tr>
+</table>
+<p><strong>Elegimos valor puntual</strong>: es más simple y explícito, y hoy hay una sola pantalla. En el <strong>Ej 12</strong> (dos pantallas) pasamos a <code>Flow</code>.</p>
+
+<div class="figs"><figure><img src="img/ej06_ejemplo.png" style="height:260px"><br>Desafío: con <code>NotaRepositoryDeEjemplo()</code><br>aparecen 3 notas sin tocar la pantalla</figure></div>
+
+<h3>Pruebas en el emulador</h3>
+<table>
+  <tr><th>Prueba</th><th>Resultado</th></tr>
+  <tr><td>Agregar “Parcial DA1” y “Compras”</td><td>“Notas guardadas (2)”, ambas en la lista ✅</td></tr>
+  <tr><td>Eliminar “Parcial DA1”</td><td>“Notas guardadas (1)”, queda “Compras” ✅</td></tr>
+  <tr><td>Cambiar <em>una línea</em> del ViewModel a <code>NotaRepositoryDeEjemplo()</code></td><td>Arranca con 3 notas precargadas; <code>PantallaNota.kt</code> sin cambios ✅</td></tr>
+</table>
+
+<h3>Preguntas de la guía</h3>
+<p><strong>1. ¿Qué conoce el Repository sobre Compose?</strong><br>
+Nada. No importa ninguna clase de Compose ni de la UI: recibe y devuelve <code>Nota</code> (una <code>data class</code> de Kotlin). Podría usarse igual desde
+otra interfaz, un test o un servicio en segundo plano.</p>
+<p><strong>2. ¿Por qué esta interfaz ayuda a probar la app?</strong><br>
+Porque el ViewModel depende del contrato, no de una implementación: en un test se le puede pasar un Repository <em>falso</em> con datos prefijados o
+que falle a propósito, sin archivos ni base de datos, y comprobar las reglas del ViewModel rápido y de forma repetible (eso es el <strong>Ej 13</strong>).</p>
+
+<div class="caja regla">
+  <strong class="titulo">Resumen</strong>
+  <ol style="margin-bottom:0">
+    <li><code>interface NotaRepository</code> = contrato: qué operaciones hay, no cómo.</li>
+    <li>El ViewModel recibe <code>NotaRepository</code> por constructor y solo habla con el contrato.</li>
+    <li>Cambiar de implementación = cambiar una línea; la pantalla no se entera.</li>
+    <li>Valor puntual + recargar después de escribir: simple mientras haya una sola pantalla.</li>
+  </ol>
+</div>
+
 </body>
 </html>

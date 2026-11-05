@@ -4,24 +4,20 @@ package com.example.mvvmlab
 // MODELO Y ESTADO DE PANTALLA
 // =====================================================================
 
-// Una nota YA GUARDADA. No es lo mismo que lo que se esta escribiendo.
+// Una nota guardada. Ej 6: ahora tiene un id, porque hay VARIAS notas y
+// el Repository necesita saber cual eliminar o reemplazar.
 data class Nota(
+    val id: String,
     val titulo: String,
     val contenido: String
 )
 
 // "Foto" de todo lo que la pantalla necesita para dibujarse.
 data class NotaUiState(
-    val titulo: String = "",
+    val titulo: String = "",                 // formulario de nueva nota
     val contenido: String = "",
-    // Ej 5: un error POR CAMPO (antes habia uno solo) para mostrarlo
-    // cerca del campo que lo provoca. null = sin error.
     val errorTitulo: String? = null,
     val errorContenido: String? = null,
     val guardando: Boolean = false,
-    val guardada: Nota? = null
-) {
-    val hayCambiosSinGuardar: Boolean
-        get() = guardada == null && (titulo.isNotEmpty() || contenido.isNotEmpty()) ||
-                guardada != null && (guardada.titulo != titulo || guardada.contenido != contenido)
-}
+    val notas: List<Nota> = emptyList()      // Ej 6: notas que devolvio el Repository
+)

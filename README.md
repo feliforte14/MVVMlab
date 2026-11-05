@@ -1,4 +1,4 @@
-# MvvmLab — Ejercicio 5: Validar sin esconder la regla en un botón
+# MvvmLab — Ejercicio 6: Repository, cambiar datos sin cambiar la pantalla
 
 Práctica de **Desarrollo de Aplicaciones I (UADE)** — *Guía de Ejercicios: MVVM y Repository* (v1.0).
 Kotlin + Jetpack Compose + Material 3.
@@ -16,49 +16,60 @@ Cada rama contiene **solo el código de su ejercicio** (la app evoluciona de una
 | `ej02-estado-pantalla` | 2 — Una pantalla no es su estado |
 | `ej03-viewmodel` | 3 — Primer ViewModel, sin magia |
 | `ej04-stateflow` | 4 — StateFlow: la pantalla observa |
-| **`ej05-validacion`** | **5 — Validar sin esconder la regla en un botón** ← esta rama |
+| `ej05-validacion` | 5 — Validar sin esconder la regla en un botón |
+| **`ej06-repository`** | **6 — Repository: cambiar datos sin cambiar la pantalla** ← esta rama |
 
 ---
 
 ## Consigna
 
-Agregar reglas: título no vacío, contenido de al menos diez caracteres y prohibición de guardar dos veces mientras se
-procesa una solicitud. Ubicar las reglas fuera de la vista. Mostrar errores cerca de los campos.
-**Desafío:** probar espacios en blanco, una nota válida y dos pulsaciones seguidas.
+Definir un contrato `NotaRepository` con operaciones para obtener, guardar y eliminar notas. Implementar primero una
+versión en memoria. El ViewModel sólo habla con el contrato. Decidir valor puntual vs `Flow` y justificarlo.
+**Desafío:** reemplazar la implementación por otra lista precargada sin modificar el composable.
 
 ## Archivos
 
 | Archivo | Capa | Cambio |
 |---|---|---|
-| `ValidadorNota.kt` | Reglas (Kotlin puro) | **Nuevo**: `ValidadorNota.validar(titulo, contenido): ErroresNota` |
-| `NotaViewModel.kt` | ViewModel | `onGuardar` aplica las reglas; `if (guardando) return` evita el doble guardado |
-| `NotaUiState.kt` | Estado | `error` → `errorTitulo` + `errorContenido` (un error por campo) |
-| `PantallaNota.kt` | View | Cada campo muestra su error con `isError` + `supportingText` |
-| `app/src/test/.../ValidadorNotaTest.kt` | Test | **Nuevo**: 5 tests JUnit (sin emulador) |
+| `NotaRepository.kt` | Datos | **Nuevo**: `interface NotaRepository` + `NotaRepositoryEnMemoria` + `NotaRepositoryDeEjemplo` (desafío) |
+| `NotaViewModel.kt` | ViewModel | Recibe `NotaRepository` por constructor; carga en `init`, `onGuardar` y `onEliminar` delegan al Repository |
+| `NotaUiState.kt` | Estado | `Nota` con `id`; estado con `notas: List<Nota>` |
+| `PantallaNota.kt` | View | `LazyColumn` con formulario + lista; `FilaNota` reutilizable; callback `onEliminar` |
 
-## Reglas
+## Contrato
 
-| Regla | Dónde vive |
+```kotlin
+interface NotaRepository {
+    suspend fun obtenerTodas(): List<Nota>
+    suspend fun guardar(nota: Nota)      // si ya existe ese id, la reemplaza
+    suspend fun eliminar(id: String)
+}
+
+class NotaViewModel(
+    private val repositorio: NotaRepository = NotaRepositoryEnMemoria()   // único lugar donde se elige
+) : ViewModel()
+```
+
+## Decisión: valor puntual (`suspend`) y no `Flow`
+
+Devuelve una "foto" de las notas; después de guardar o eliminar, el ViewModel vuelve a pedirla (`recargarNotas()`).
+Es simple y alcanza con **una sola pantalla**. `Flow` conviene cuando varias pantallas observan los mismos datos o la
+fuente ya emite cambios (Room) → se adopta en el Ej 12.
+
+## Pruebas (emulador)
+
+| Prueba | Resultado |
 |---|---|
-| Título no vacío (`isBlank`: solo espacios cuenta como vacío) | `ValidadorNota` |
-| Contenido ≥ 10 caracteres (`trim()` antes de contar) | `ValidadorNota` |
-| No guardar dos veces mientras se procesa | `NotaViewModel.onGuardar` (el botón deshabilitado es solo ayuda visual) |
-
-**¿Cuándo se limpia un error?** Al editar el campo que lo causó, y solo ese error.
-
-## Pruebas
-
-- `ValidadorNotaTest`: 5/5 ✅ (solo espacios, espacios alrededor, borde de 10 caracteres, nota válida, ambos errores).
-- Emulador: título `"   "` y contenido `"corto"` → cada error debajo de su campo; doble toque rápido → Logcat muestra **un solo** `guardando`.
+| Agregar 2 notas | "Notas guardadas (2)" ✅ |
+| Eliminar una | "Notas guardadas (1)" ✅ |
+| Cambiar una línea a `NotaRepositoryDeEjemplo()` | 3 notas precargadas, `PantallaNota.kt` sin cambios ✅ |
 
 ## Preguntas de la guía
 
-**¿Cuál es una regla de negocio y cuál es una decisión visual?**
-Regla: "contenido ≥ 10 caracteres", "no guardar dos veces a la vez" (valen en cualquier interfaz).
-Visual: error en rojo debajo del campo, botón deshabilitado, texto "Guardando...".
+**¿Qué conoce el Repository sobre Compose?** Nada: recibe y devuelve `Nota` (Kotlin puro).
 
-**¿En qué momento conviene limpiar un mensaje de error?**
-Cuando el usuario modifica el campo que lo causó, y solo ese error.
+**¿Por qué esta interfaz ayuda a probar la app?** El ViewModel depende del contrato: en un test se le pasa un
+Repository falso (datos fijos o fallas a propósito) sin archivos ni base de datos (Ej 13).
 
 ## Criterio de finalización
-- ✅ Se cumplen las validaciones y el botón sólo comunica una intención al ViewModel.
+- ✅ La implementación concreta se puede cambiar sin reescribir la pantalla.
